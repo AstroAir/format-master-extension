@@ -1,6 +1,7 @@
 import * as xmlFormatter from "xml-formatter";
 import { BaseFormatter } from "./base-formatter";
 import { FormatOptions, FormatResult } from "../types";
+import formatXml from "xml-formatter";
 
 /**
  * **Formatter for XML files**
@@ -26,13 +27,16 @@ export class XmlFormatter extends BaseFormatter {
         lineSeparator: "\n",
         whiteSpaceAtEndOfSelfclosingTag: false,
         throwOnFailure: true,
-      };
-
-      // **Apply custom rules**
+      }; // **Apply custom rules**
       this.applyCustomRules(xmlOptions, options);
 
       // **Format the XML**
-      const formattedXml = xmlFormatter(preprocessedText, xmlOptions);
+      let formattedXml = formatXml(preprocessedText, xmlOptions);
+
+      // **Handle SVG-specific formatting if applicable**
+      if (options.languageId === "svg") {
+        formattedXml = this.formatSvg(formattedXml, options);
+      }
 
       // **Post-process the result**
       const finalText = this.postprocess(formattedXml, options);
@@ -80,7 +84,14 @@ export class XmlFormatter extends BaseFormatter {
       typeof rules.preserveComments === "boolean" &&
       !rules.preserveComments
     ) {
+      // If preserveComments is false, we don't want to filter them out.
+      // The default filter keeps comments, so we only change it if preserveComments is explicitly false.
+      // xmlFormatter's filter: return true to keep the node, false to remove.
+      // To remove comments when preserveComments is false:
       xmlOptions.filter = (node) => node.type !== "Comment";
+    } else if (rules.preserveComments === true) {
+      // To keep comments when preserveComments is true (or undefined, as per default)
+      xmlOptions.filter = (_node) => true;
     }
 
     if (typeof rules.whiteSpaceAtEndOfSelfClosingTag === "boolean") {
@@ -97,7 +108,7 @@ export class XmlFormatter extends BaseFormatter {
   /**
    * **Handle SVG-specific formatting**
    */
-  private _formatSvg(text: string, options: FormatOptions): string {
+  private formatSvg(text: string, options: FormatOptions): string {
     // **SVG-specific optimizations**
     let formatted = text;
 

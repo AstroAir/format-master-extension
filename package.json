@@ -7,17 +7,183 @@
     "vscode": "^1.100.0"
   },
   "categories": [
+    "Formatters",
     "Other"
   ],
-  "activationEvents": [],
+  "keywords": [
+    "format",
+    "formatter",
+    "code",
+    "beautify",
+    "typescript"
+  ],
+  "activationEvents": [
+    "onLanguage:javascript",
+    "onLanguage:typescript",
+    "onLanguage:json",
+    "onLanguage:xml"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "format-master.helloWorld",
-        "title": "Hello World"
+        "command": "formatMaster.formatDocument",
+        "title": "Format Document",
+        "category": "Format Master"
+      },
+      {
+        "command": "formatMaster.formatSelection",
+        "title": "Format Selection",
+        "category": "Format Master"
+      },
+      {
+        "command": "formatMaster.toggleFormatOnSave",
+        "title": "Toggle Format on Save",
+        "category": "Format Master"
+      },
+      {
+        "command": "formatMaster.forceBuiltInFormatter",
+        "title": "Force Built-in Formatter",
+        "category": "Format Master"
+      },
+      {
+        "command": "formatMaster.forceCustomFormatter",
+        "title": "Force Custom Formatter",
+        "category": "Format Master"
+      },
+      {
+        "command": "formatMaster.showFormatterInfo",
+        "title": "Show Formatter Information",
+        "category": "Format Master"
+      },
+      {
+        "command": "formatMaster.clearFormatterCache",
+        "title": "Clear Formatter Cache",
+        "category": "Format Master"
       }
-    ]
+    ],
+    "keybindings": [
+      {
+        "command": "formatMaster.formatDocument",
+        "key": "ctrl+shift+f",
+        "mac": "cmd+shift+f",
+        "when": "editorTextFocus"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "formatMaster.formatDocument",
+          "group": "1_modification",
+          "when": "editorHasDocumentFormattingProvider"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "formatMaster.formatDocument",
+          "when": "editorIsOpen"
+        },
+        {
+          "command": "formatMaster.formatSelection",
+          "when": "editorHasSelection"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Format Master",
+      "properties": {
+        "formatMaster.formatOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Format files on save"
+        },
+        "formatMaster.indentSize": {
+          "type": "number",
+          "default": 2,
+          "description": "Number of spaces for indentation"
+        },
+        "formatMaster.useTabs": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use tabs instead of spaces"
+        },
+        "formatMaster.maxLineLength": {
+          "type": "number",
+          "default": 120,
+          "description": "Maximum line length"
+        },
+        "formatMaster.insertFinalNewline": {
+          "type": "boolean",
+          "default": true,
+          "description": "Insert final newline"
+        },
+        "formatMaster.trimTrailingWhitespace": {
+          "type": "boolean",
+          "default": true,
+          "description": "Trim trailing whitespace"
+        },
+        "formatMaster.enabledLanguages": {
+          "type": "array",
+          "default": [
+            "javascript",
+            "typescript",
+            "json",
+            "xml"
+          ],
+          "description": "Languages to enable formatting for"
+        },
+        "formatMaster.customRules": {
+          "type": "object",
+          "default": {},
+          "description": "Custom formatting rules per language"
+        },
+        "formatMaster.useBuiltInFormatter": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use built-in VSCode formatters when available"
+        },
+        "formatMaster.fallbackToBuiltIn": {
+          "type": "boolean",
+          "default": true,
+          "description": "Fallback to built-in formatter if Format Master fails"
+        },
+        "formatMaster.preferredFormatter": {
+          "type": "string",
+          "enum": [
+            "formatMaster",
+            "builtin",
+            "auto"
+          ],
+          "default": "auto",
+          "description": "Preferred formatter to use",
+          "enumDescriptions": [
+            "Always use Format Master when available",
+            "Always use built-in formatter when available",
+            "Automatically choose the best formatter"
+          ]
+        },
+        "formatMaster.chainFormatters": {
+          "type": "boolean",
+          "default": false,
+          "description": "Chain formatters (apply built-in first, then Format Master)"
+        },
+        "formatMaster.retryOnFailure": {
+          "type": "boolean",
+          "default": true,
+          "description": "Retry formatting with alternative formatter on failure"
+        },
+        "formatMaster.formatterTimeout": {
+          "type": "number",
+          "default": 10000,
+          "description": "Timeout for formatter execution in milliseconds"
+        },
+        "formatMaster.showFormatterUsed": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show which formatter was used in status bar"
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",

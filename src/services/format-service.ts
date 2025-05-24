@@ -253,7 +253,7 @@ export class FormatService implements IFormatService {
     
     const result = await this.integrationService.executeChainedFormatting(
       document,
-      async (doc, opts) => await this.executeCustomOnly(doc, range, opts),
+      async (doc, opts) => await this.executeCustomOnly(doc, range, this.ensureExtendedOptions(opts, doc)),
       options,
       range
     );

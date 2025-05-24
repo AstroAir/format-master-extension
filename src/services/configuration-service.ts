@@ -46,6 +46,7 @@ export class ConfigurationService implements IConfigurationService {
         "xml",
       ]),
       customRules: config.get<Record<string, any>>("customRules", {}),
+      formatOnSave: config.get<boolean>("formatOnSave", true),
     };
 
     return this.cachedConfig;

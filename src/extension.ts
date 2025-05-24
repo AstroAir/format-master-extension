@@ -33,7 +33,7 @@ export async function activate(
 ): Promise<void> {
   try {
     // **Initialize services**
-    const loggingService = new LoggingService("Format Master");
+    const loggingService = new LoggingService({ channelName: "Format Master" });
     const configService = new ConfigurationService();
     const formatService = new FormatService(loggingService);
 

@@ -1,6 +1,7 @@
 import * as prettier from "prettier";
 import { BaseFormatter } from "./base-formatter";
 import { FormatOptions, FormatResult } from "../types";
+import { FormatError } from "../errors/format-error"; // 导入自定义格式化错误类型
 
 /**
  * **Formatter for JavaScript and TypeScript files**
@@ -59,11 +60,54 @@ export class JavaScriptFormatter extends BaseFormatter {
 
       return this.createSuccessResult(normalizedText);
     } catch (error) {
-      if (error instanceof Error) {
-        return this.createErrorResult(error);
-      }
-      return this.createErrorResult(new Error("Unknown formatting error"));
+      return this.handleFormattingError(error, options);
     }
+  }
+
+  /**
+   * **Handle formatting errors with detailed diagnostics**
+   */
+  private handleFormattingError(error: unknown, options: FormatOptions): FormatResult {
+    // 创建基础错误信息
+    const baseMessage = error instanceof Error ? error.message : "Unknown formatting error";
+    const errorType = error instanceof Error ? error.constructor.name : "Error";
+    
+    // 构建增强错误信息
+    let enhancedMessage = `${errorType}: ${baseMessage}`;
+    
+    // 添加特定语言的错误提示
+    const languageInfo = `Language: ${options.languageId}`;
+    enhancedMessage += `\n${languageInfo}`;
+    
+    // 如果是 Prettier 的语法错误，尝试提取行号和列号信息
+    if (baseMessage.includes("Unexpected token") || baseMessage.includes("SyntaxError")) {
+      const match = baseMessage.match(/\((\d+):(\d+)\)/);
+      if (match && match.length >= 3) {
+        const [_, line, column] = match;
+        enhancedMessage += `\nSyntax error at line ${line}, column ${column}`;
+        enhancedMessage += `\nPlease check for syntax errors in your code.`;
+      }
+    }
+    
+    // 添加常见错误的解决建议
+    if (baseMessage.includes("Unknown option")) {
+      enhancedMessage += `\nThis may be due to incompatible Prettier options or version mismatch.`;
+    } else if (baseMessage.includes("No parser could be inferred")) {
+      enhancedMessage += `\nCould not determine appropriate parser for ${options.languageId}.`;
+    }
+    
+    // 创建增强错误对象
+    const formattingError = new FormatError(
+      enhancedMessage,
+      options.languageId,
+      error instanceof Error ? error : undefined
+    );
+    
+    return {
+      success: false,
+      text: undefined,
+      error: formattingError
+    };
   }
 
   /**

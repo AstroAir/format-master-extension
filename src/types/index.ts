@@ -11,6 +11,7 @@ export interface FormatConfig {
   trimTrailingWhitespace: boolean;
   enabledLanguages: string[];
   customRules: Record<string, any>;
+  formatOnSave: boolean;
 }
 
 /**
