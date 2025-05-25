@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 
 /**
- * **Core formatting configuration interface**
+ * **Enhanced formatting configuration interface**
  */
 export interface FormatConfig {
   indentSize: number;
@@ -12,25 +12,165 @@ export interface FormatConfig {
   enabledLanguages: string[];
   customRules: Record<string, any>;
   formatOnSave: boolean;
+  enablePreview: boolean;
+  validateBeforeFormat: boolean;
+  performanceMonitoring: boolean;
+  maxFileSizeKB: number;
+  incrementalFormatting: boolean;
+  formatOnPaste: boolean;
+  formatOnType: boolean;
+  configurationProfiles: Record<string, Partial<FormatConfig>>;
+  activeProfile: string;
+  respectEditorConfig: boolean;
+  respectPrettierConfig: boolean;
+  statusBarIntegration: boolean;
+  diagnosticsLevel: DiagnosticLevel;
+  languageSpecific: Record<string, LanguageConfig>;
 }
 
 /**
- * **Formatting options for specific operations**
+ * **Language-specific configuration**
+ */
+export interface LanguageConfig {
+  enabled: boolean;
+  formatter: FormatterType;
+  rules: Record<string, any>;
+  priority?: FormatterPriority;
+  timeout?: number;
+  customFormatter?: string;
+}
+
+/**
+ * **Diagnostic levels**
+ */
+export enum DiagnosticLevel {
+  OFF = "off",
+  ERROR = "error", 
+  WARNING = "warning",
+  INFO = "info",
+  DEBUG = "debug"
+}
+
+/**
+ * **Formatter types**
+ */
+export enum FormatterType {
+  BUILTIN = "builtin",
+  FORMAT_MASTER = "formatMaster",
+  AUTO = "auto",
+  CUSTOM = "custom"
+}
+
+/**
+ * **Performance metrics interface**
+ */
+export interface PerformanceMetrics {
+  totalFormatOperations: number;
+  averageFormatTime: number;
+  lastFormatTime: number;
+  successRate: number;
+  errorCount: number;
+  cacheHitRate: number;
+  memoryUsage: number;
+  languageBreakdown: Record<string, LanguageMetrics>;
+}
+
+/**
+ * **Language-specific metrics**
+ */
+export interface LanguageMetrics {
+  operationCount: number;
+  averageTime: number;
+  errorCount: number;
+  lastUsed: Date;
+}
+
+/**
+ * **Configuration profile interface**
+ */
+export interface ConfigurationProfile {
+  name: string;
+  description?: string;
+  config: Partial<FormatConfig>;
+  tags?: string[];
+  created: Date;
+  lastUsed?: Date;
+}
+
+/**
+ * **Validation result interface**
+ */
+export interface ValidationResult {
+  isValid: boolean;
+  errors: ValidationError[];
+  warnings: ValidationError[];
+  suggestions?: string[];
+}
+
+/**
+ * **Validation error interface**
+ */
+export interface ValidationError {
+  field: string;
+  message: string;
+  severity: 'error' | 'warning' | 'info';
+  suggestedFix?: any;
+}
+
+/**
+ * **Enhanced formatting options for specific operations**
  */
 export interface FormatOptions extends Partial<FormatConfig> {
   languageId: string;
   tabSize?: number;
   insertSpaces?: boolean;
+  fileName?: string;
+  workspaceFolder?: string;
+  profile?: string;
+  
+  // YAML specific options
+  alignComments?: boolean;
+  spaceAfterDash?: boolean;
+  spaceAfterColon?: boolean;
+  quoteKeys?: boolean;
+  normalizeBooleans?: boolean;
+  normalizeNulls?: boolean;
 }
 
 /**
- * **Result of a formatting operation**
+ * **Enhanced result of a formatting operation**
  */
 export interface FormatResult {
   success: boolean;
   text?: string;
   error?: Error;
   changes?: number;
+  formatterUsed?: string;
+  executionTime?: number;
+  originalLength?: number;
+  newLength?: number;
+  linesChanged?: number;
+  warnings?: string[];
+}
+
+/**
+ * **Preview result interface**
+ */
+export interface PreviewResult extends FormatResult {
+  diff?: TextDiff[];
+  previewText?: string;
+  canApply: boolean;
+}
+
+/**
+ * **Text diff interface**
+ */
+export interface TextDiff {
+  type: 'add' | 'remove' | 'modify';
+  lineNumber: number;
+  originalText?: string;
+  newText?: string;
+  range?: vscode.Range;
 }
 
 /**
@@ -58,6 +198,13 @@ export interface IConfigurationService {
   getConfig(): FormatConfig;
   getLanguageConfig(languageId: string): Partial<FormatConfig>;
   onConfigurationChanged: vscode.Event<void>;
+  validateConfiguration(): Promise<ValidationResult>;
+  exportConfiguration(filePath: string): Promise<void>;
+  importConfiguration(filePath: string): Promise<void>;
+  createProfile(name: string, config: Partial<FormatConfig>): Promise<void>;
+  getProfiles(): Promise<ConfigurationProfile[]>;
+  switchProfile(profileName: string): Promise<void>;
+  deleteProfile(profileName: string): Promise<void>;
 }
 
 /**
@@ -86,6 +233,28 @@ export interface IFormatService {
   ): Promise<vscode.TextEdit[]>;
   registerFormatter(formatter: IFormatter): void;
   getFormatter(languageId: string): IFormatter | undefined;
+}
+
+/**
+ * **Performance monitoring service interface**
+ */
+export interface IPerformanceMonitoringService {
+  recordFormatOperation(languageId: string, duration: number, success: boolean): void;
+  getMetrics(): PerformanceMetrics;
+  getLanguageMetrics(languageId: string): LanguageMetrics | undefined;
+  clearMetrics(): void;
+  generateReport(): string;
+  setMemoryUsage(usage: number): void;
+}
+
+/**
+ * **Preview service interface**
+ */
+export interface IPreviewService {
+  previewFormat(document: vscode.TextDocument, options?: FormatOptions): Promise<PreviewResult>;
+  showPreview(previewResult: PreviewResult): Promise<boolean>;
+  generateDiff(original: string, formatted: string): TextDiff[];
+  disposePreview(): void;
 }
 
 /**

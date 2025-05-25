@@ -21,7 +21,16 @@
     "onLanguage:javascript",
     "onLanguage:typescript",
     "onLanguage:json",
-    "onLanguage:xml"
+    "onLanguage:xml",
+    "onLanguage:css",
+    "onLanguage:scss",
+    "onLanguage:less",
+    "onLanguage:html",
+    "onLanguage:python",
+    "onLanguage:markdown",
+    "onLanguage:yaml",
+    "onLanguage:yml",
+    "onStartupFinished"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -29,17 +38,20 @@
       {
         "command": "formatMaster.formatDocument",
         "title": "Format Document",
-        "category": "Format Master"
+        "category": "Format Master",
+        "icon": "$(symbol-color)"
       },
       {
         "command": "formatMaster.formatSelection",
         "title": "Format Selection",
-        "category": "Format Master"
+        "category": "Format Master",
+        "icon": "$(selection)"
       },
       {
         "command": "formatMaster.toggleFormatOnSave",
         "title": "Toggle Format on Save",
-        "category": "Format Master"
+        "category": "Format Master",
+        "icon": "$(save)"
       },
       {
         "command": "formatMaster.forceBuiltInFormatter",
@@ -54,12 +66,56 @@
       {
         "command": "formatMaster.showFormatterInfo",
         "title": "Show Formatter Information",
-        "category": "Format Master"
+        "category": "Format Master",
+        "icon": "$(info)"
       },
       {
         "command": "formatMaster.clearFormatterCache",
         "title": "Clear Formatter Cache",
-        "category": "Format Master"
+        "category": "Format Master",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "formatMaster.openConfigurationWizard",
+        "title": "Open Configuration Wizard",
+        "category": "Format Master",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "formatMaster.previewFormatting",
+        "title": "Preview Formatting Changes",
+        "category": "Format Master",
+        "icon": "$(preview)"
+      },
+      {
+        "command": "formatMaster.validateConfiguration",
+        "title": "Validate Configuration",
+        "category": "Format Master",
+        "icon": "$(check)"
+      },
+      {
+        "command": "formatMaster.exportConfiguration",
+        "title": "Export Configuration",
+        "category": "Format Master",
+        "icon": "$(export)"
+      },
+      {
+        "command": "formatMaster.importConfiguration",
+        "title": "Import Configuration",
+        "category": "Format Master",
+        "icon": "$(import)"
+      },
+      {
+        "command": "formatMaster.formatWorkspace",
+        "title": "Format All Files in Workspace",
+        "category": "Format Master",
+        "icon": "$(folder)"
+      },
+      {
+        "command": "formatMaster.showPerformanceMetrics",
+        "title": "Show Performance Metrics",
+        "category": "Format Master",
+        "icon": "$(graph)"
       }
     ],
     "keybindings": [
@@ -128,9 +184,35 @@
             "javascript",
             "typescript",
             "json",
-            "xml"
+            "xml",
+            "css",
+            "scss",
+            "less",
+            "html",
+            "python",
+            "markdown",
+            "yaml"
           ],
-          "description": "Languages to enable formatting for"
+          "description": "Languages to enable formatting for",
+          "items": {
+            "type": "string",
+            "enum": [
+              "javascript",
+              "typescript",
+              "javascriptreact",
+              "typescriptreact",
+              "json",
+              "xml",
+              "css",
+              "scss",
+              "less",
+              "html",
+              "python",
+              "markdown",
+              "yaml",
+              "yml"
+            ]
+          }
         },
         "formatMaster.customRules": {
           "type": "object",
@@ -181,6 +263,105 @@
           "type": "boolean",
           "default": false,
           "description": "Show which formatter was used in status bar"
+        },
+        "formatMaster.enablePreview": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable formatting preview functionality"
+        },
+        "formatMaster.validateBeforeFormat": {
+          "type": "boolean",
+          "default": true,
+          "description": "Validate syntax before formatting"
+        },
+        "formatMaster.performanceMonitoring": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable performance monitoring and metrics collection"
+        },
+        "formatMaster.maxFileSizeKB": {
+          "type": "number",
+          "default": 1024,
+          "minimum": 1,
+          "maximum": 10240,
+          "description": "Maximum file size in KB to format"
+        },
+        "formatMaster.incrementalFormatting": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use incremental formatting for large files"
+        },
+        "formatMaster.formatOnPaste": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically format code when pasting"
+        },
+        "formatMaster.formatOnType": {
+          "type": "boolean",
+          "default": false,
+          "description": "Format code as you type"
+        },
+        "formatMaster.configurationProfiles": {
+          "type": "object",
+          "default": {},
+          "description": "Named configuration profiles for different projects"
+        },
+        "formatMaster.activeProfile": {
+          "type": "string",
+          "default": "default",
+          "description": "Currently active configuration profile"
+        },
+        "formatMaster.respectEditorConfig": {
+          "type": "boolean",
+          "default": true,
+          "description": "Respect .editorconfig files when found"
+        },
+        "formatMaster.respectPrettierConfig": {
+          "type": "boolean",
+          "default": true,
+          "description": "Respect .prettierrc files when found"
+        },
+        "formatMaster.statusBarIntegration": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show formatter status in status bar"
+        },
+        "formatMaster.diagnosticsLevel": {
+          "type": "string",
+          "enum": [
+            "off",
+            "error",
+            "warning",
+            "info",
+            "debug"
+          ],
+          "default": "warning",
+          "description": "Level of diagnostic information to show"
+        },
+        "formatMaster.languageSpecific": {
+          "type": "object",
+          "default": {},
+          "description": "Language-specific formatting configurations",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "default": true
+              },
+              "formatter": {
+                "type": "string",
+                "enum": [
+                  "builtin",
+                  "formatMaster",
+                  "auto"
+                ]
+              },
+              "rules": {
+                "type": "object"
+              }
+            }
+          }
         }
       }
     }
@@ -197,6 +378,8 @@
     "test": "vscode-test"
   },
   "devDependencies": {
+    "@types/cssbeautify": "^0.3.5",
+    "@types/js-beautify": "^1.14.3",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
     "@types/vscode": "^1.100.0",
@@ -211,6 +394,10 @@
     "webpack-cli": "^6.0.1"
   },
   "dependencies": {
+    "autoprefixer": "^10.4.21",
+    "cssbeautify": "^0.3.1",
+    "js-beautify": "^1.15.4",
+    "postcss": "^8.5.3",
     "prettier": "^3.5.3",
     "xml-formatter": "^3.6.6"
   }
