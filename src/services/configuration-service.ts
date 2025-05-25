@@ -67,11 +67,17 @@ export class ConfigurationService implements IConfigurationService {
       formatOnType: config.get<boolean>("formatOnType", false),
       configurationProfiles: config.get<Record<string, Partial<FormatConfig>>>("configurationProfiles", {}),
       activeProfile: config.get<string>("activeProfile", "default"),
-      respectEditorConfig: config.get<boolean>("respectEditorConfig", true),
-      respectPrettierConfig: config.get<boolean>("respectPrettierConfig", true),
+      respectEditorConfig: config.get<boolean>("respectEditorConfig", true),      respectPrettierConfig: config.get<boolean>("respectPrettierConfig", true),
       statusBarIntegration: config.get<boolean>("statusBarIntegration", true),
       diagnosticsLevel: config.get<DiagnosticLevel>("diagnosticsLevel", DiagnosticLevel.WARNING),
-      languageSpecific: config.get<Record<string, LanguageConfig>>("languageSpecific", {})
+      languageSpecific: config.get<Record<string, LanguageConfig>>("languageSpecific", {}),
+      
+      // **Universal formatter scanning options**
+      enableAutoFormatterDiscovery: config.get<boolean>("enableAutoFormatterDiscovery", true),
+      formatterScanOnStartup: config.get<boolean>("formatterScanOnStartup", true),
+      formatterScanCacheTimeout: config.get<number>("formatterScanCacheTimeout", 30),
+      showFormatterSuggestions: config.get<boolean>("showFormatterSuggestions", true),
+      autoRefreshLanguageSupport: config.get<boolean>("autoRefreshLanguageSupport", false)
     };
 
     return this.mergeWithProfile(this.cachedConfig, workspaceFolder);

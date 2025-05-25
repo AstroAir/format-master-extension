@@ -21,27 +21,41 @@ export class FormatterIntegrationService {
   constructor(private loggingService: ILoggingService) {
     this.initializeFormatterDetection();
   }
-
   /**
    * **Initialize detection of built-in formatters**
    */
   private async initializeFormatterDetection(): Promise<void> {
     try {
-      // **Detect formatters for common languages**
+      // **Detect formatters for all supported languages**
       const languages = [
-        "javascript",
-        "typescript",
-        "json",
-        "html",
-        "css",
-        "xml",
+        // **JavaScript/TypeScript family**
+        "javascript", "typescript", "javascriptreact", "typescriptreact",
+        // **Web technologies**
+        "html", "css", "scss", "less", "json", "jsonc", "xml",
+        // **Programming languages**
+        "python", "java", "csharp", "cpp", "c", "go", "rust", "php",
+        // **Markup and data**
+        "markdown", "yaml", "yml", "toml", "ini",
+        // **Shell and config**
+        "powershell", "shellscript", "dockerfile", "sql",
+        // **Other popular languages**
+        "ruby", "perl", "swift", "kotlin", "scala", "r", "lua"
       ];
 
-      for (const languageId of languages) {
-        await this.detectBuiltInFormatter(languageId);
-      }
+      // **Parallel detection for better performance**
+      const detectionPromises = languages.map(lang => 
+        this.detectBuiltInFormatter(lang).catch(error => {
+          this.loggingService.warn(`Failed to detect formatter for ${lang}:`, error);
+          return null;
+        })
+      );
 
-      this.loggingService.info("🔍 Formatter detection completed");
+      await Promise.allSettled(detectionPromises);
+
+      // **Also detect any additional formatters from extensions**
+      await this.detectExtensionFormatters();
+
+      this.loggingService.info(`🔍 Formatter detection completed for ${this.builtInFormatters.size} languages`);
     } catch (error) {
       this.loggingService.error(
         "Failed to initialize formatter detection",
@@ -131,31 +145,15 @@ export class FormatterIntegrationService {
       return false;
     }
   }
-
   /**
    * **Attempt to identify the formatter extension**
    */
   private async identifyFormatterExtension(
     languageId: string
   ): Promise<string | undefined> {
-    // **Check common formatter extensions**
-    const commonFormatters = {
-      javascript: [
-        "esbenp.prettier-vscode",
-        "ms-vscode.vscode-typescript-next",
-      ],
-      typescript: [
-        "esbenp.prettier-vscode",
-        "ms-vscode.vscode-typescript-next",
-      ],
-      json: ["esbenp.prettier-vscode", "ms-vscode.json"],
-      html: ["esbenp.prettier-vscode", "ms-vscode.html"],
-      css: ["esbenp.prettier-vscode", "ms-vscode.css"],
-      xml: ["redhat.vscode-xml"],
-    };
-
-    const possibleFormatters =
-      commonFormatters[languageId as keyof typeof commonFormatters] || [];
+    // **Use comprehensive language extension mapping**
+    const languageExtensionMap = this.getLanguageExtensionMap();
+    const possibleFormatters = languageExtensionMap[languageId] || [];
 
     for (const formatterId of possibleFormatters) {
       const extension = vscode.extensions.getExtension(formatterId);
@@ -331,38 +329,180 @@ export class FormatterIntegrationService {
   }
 
   /**
-   * **Get file extension for language ID**
+   * **Detect formatters provided by extensions**
+   */
+  private async detectExtensionFormatters(): Promise<void> {
+    try {
+      // **Get all active extensions**
+      const activeExtensions = vscode.extensions.all.filter(ext => ext.isActive);
+      
+      // **Check each extension for formatter contributions**
+      for (const extension of activeExtensions) {
+        const contributes = extension.packageJSON?.contributes;
+        if (!contributes) {
+          continue;
+        }
+
+        // **Check for language contributions**
+        const languages = contributes.languages || [];
+        for (const language of languages) {
+          if (language.id && !this.builtInFormatters.has(language.id)) {
+            await this.detectBuiltInFormatter(language.id);
+          }
+        }
+
+        // **Check for formatting providers in grammars**
+        const grammars = contributes.grammars || [];
+        for (const grammar of grammars) {
+          if (grammar.language && !this.builtInFormatters.has(grammar.language)) {
+            await this.detectBuiltInFormatter(grammar.language);
+          }
+        }
+      }
+
+      this.loggingService.debug(`Detected formatters from ${activeExtensions.length} extensions`);
+    } catch (error) {
+      this.loggingService.warn("Failed to detect extension formatters:", error);
+    }
+  }
+
+  /**
+   * **Get comprehensive language-to-extension mapping**
+   */
+  private getLanguageExtensionMap(): Record<string, string[]> {
+    return {
+      // **JavaScript/TypeScript**
+      javascript: ["esbenp.prettier-vscode", "ms-vscode.vscode-typescript-next"],
+      typescript: ["esbenp.prettier-vscode", "ms-vscode.vscode-typescript-next"],
+      javascriptreact: ["esbenp.prettier-vscode", "ms-vscode.vscode-typescript-next"],
+      typescriptreact: ["esbenp.prettier-vscode", "ms-vscode.vscode-typescript-next"],
+      
+      // **Web technologies**
+      html: ["esbenp.prettier-vscode", "ms-vscode.html-language-features"],
+      css: ["esbenp.prettier-vscode", "ms-vscode.css-language-features"],
+      scss: ["esbenp.prettier-vscode", "ms-vscode.css-language-features"],
+      less: ["esbenp.prettier-vscode", "ms-vscode.css-language-features"],
+      json: ["esbenp.prettier-vscode", "ms-vscode.json-language-features"],
+      jsonc: ["esbenp.prettier-vscode", "ms-vscode.json-language-features"],
+      xml: ["redhat.vscode-xml", "dotjoshjohnson.xml"],
+      
+      // **Programming languages**
+      python: ["ms-python.python", "ms-python.autopep8", "ms-python.black-formatter"],
+      java: ["redhat.java", "vscjava.vscode-java-pack"],
+      csharp: ["ms-dotnettools.csharp", "ms-dotnettools.vscode-dotnet-runtime"],
+      cpp: ["ms-vscode.cpptools", "ms-vscode.cpptools-extension-pack"],
+      c: ["ms-vscode.cpptools"],
+      go: ["golang.go"],
+      rust: ["rust-lang.rust-analyzer", "vadimcn.vscode-lldb"],
+      php: ["bmewburn.vscode-intelephense-client", "xdebug.php-debug"],
+      
+      // **Markup and data**
+      markdown: ["yzhang.markdown-all-in-one", "esbenp.prettier-vscode"],
+      yaml: ["redhat.vscode-yaml", "esbenp.prettier-vscode"],
+      yml: ["redhat.vscode-yaml", "esbenp.prettier-vscode"],
+      toml: ["tamasfe.even-better-toml"],
+      
+      // **Shell and config**
+      powershell: ["ms-vscode.powershell"],
+      shellscript: ["timonwong.shellcheck"],
+      dockerfile: ["ms-azuretools.vscode-docker"],
+      sql: ["ms-mssql.mssql"],
+      
+      // **Other languages**
+      ruby: ["rebornix.ruby", "castwide.solargraph"],
+      swift: ["swift-server.swift"],
+      kotlin: ["mathiasfrohlich.kotlin"],
+      scala: ["scalameta.metals"],
+      r: ["ikuyadeu.r"],
+      lua: ["sumneko.lua"]
+    };
+  }
+
+  /**
+   * **Enhanced file extension mapping**
    */
   private getFileExtension(languageId: string): string {
-    const extensions: Record<string, string> = {
+    const extensionMap: Record<string, string> = {
       javascript: "js",
-      typescript: "ts",
-      json: "json",
+      typescript: "ts", 
+      javascriptreact: "jsx",
+      typescriptreact: "tsx",
       html: "html",
       css: "css",
+      scss: "scss",
+      less: "less",
+      json: "json",
+      jsonc: "jsonc",
       xml: "xml",
+      python: "py",
+      java: "java",
+      csharp: "cs",
+      cpp: "cpp",
+      c: "c",
+      go: "go",
+      rust: "rs",
+      php: "php",
+      markdown: "md",
+      yaml: "yaml",
+      yml: "yml",
+      toml: "toml",
+      powershell: "ps1",
+      shellscript: "sh",
+      dockerfile: "dockerfile",
+      sql: "sql",
+      ruby: "rb",
+      swift: "swift",
+      kotlin: "kt",
+      scala: "scala",
+      r: "r",
+      lua: "lua"
     };
-
-    return extensions[languageId] || "txt";
+    
+    return extensionMap[languageId] || "txt";
   }
 
   /**
-   * **Get test content for formatter detection**
+   * **Enhanced test content generation**
    */
   private getTestContent(languageId: string): string {
-    const testContent: Record<string, string> = {
-      javascript: 'function test(){return "hello";}',
-      typescript: 'function test():string{return "hello";}',
-      json: '{"name":"test","value":123}',
-      html: "<div><p>Hello</p></div>",
-      css: "body{margin:0;padding:0;}",
-      xml: "<root><item>test</item></root>",
+    const testContentMap: Record<string, string> = {
+      javascript: "const hello = 'world';",
+      typescript: "const hello: string = 'world';",
+      javascriptreact: "const Component = () => <div>Hello</div>;",
+      typescriptreact: "const Component: React.FC = () => <div>Hello</div>;",
+      html: "<div>Hello World</div>",
+      css: "body { margin: 0; }",
+      scss: "$color: red; body { color: $color; }",
+      less: "@color: red; body { color: @color; }",
+      json: '{"hello": "world"}',
+      jsonc: '{"hello": "world", /* comment */}',
+      xml: '<?xml version="1.0"?><root>Hello</root>',
+      python: "def hello():\n    print('world')",
+      java: "public class Hello { public static void main(String[] args) {} }",
+      csharp: "namespace Hello { class Program { static void Main() {} } }",
+      cpp: "#include <iostream>\nint main() { return 0; }",
+      c: "#include <stdio.h>\nint main() { return 0; }",
+      go: "package main\nimport \"fmt\"\nfunc main() {}",
+      rust: "fn main() { println!(\"Hello\"); }",
+      php: "<?php echo 'Hello World'; ?>",
+      markdown: "# Hello World\nThis is a test.",
+      yaml: "hello: world\nlist:\n  - item1\n  - item2",
+      yml: "hello: world",
+      toml: "[hello]\nworld = true",
+      powershell: "Write-Host 'Hello World'",
+      shellscript: "#!/bin/bash\necho 'Hello World'",
+      dockerfile: "FROM node:alpine\nRUN echo 'hello'",
+      sql: "SELECT * FROM users WHERE id = 1;",
+      ruby: "puts 'Hello World'",
+      swift: "print(\"Hello World\")",
+      kotlin: "fun main() { println(\"Hello\") }",
+      scala: "object Hello extends App { println(\"Hello\") }",
+      r: "print('Hello World')",
+      lua: "print('Hello World')"
     };
-
-    return testContent[languageId] || "test content";
-  }
-
-  /**
+    
+    return testContentMap[languageId] || "Hello World";
+  }  /**
    * **Get formatter info for language**
    */
   getFormatterInfo(languageId: string): BuiltInFormatterInfo | undefined {

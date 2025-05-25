@@ -23,9 +23,16 @@ const extensionConfig = {
     vscode: 'commonjs vscode' // the vscode-module is created on-the-fly and must be excluded. Add other modules that cannot be webpack'ed, 📖 -> https://webpack.js.org/configuration/externals/
     // modules added here also need to be added in the .vscodeignore file
   },
+  ignoreWarnings: [
+    {
+      module: /prettier/,
+      message: /Critical dependency/,
+    },
+  ],
   resolve: {
     // support reading TypeScript and JavaScript files, 📖 -> https://github.com/TypeStrong/ts-loader
-    extensions: ['.ts', '.js']
+    extensions: ['.ts', '.js'],
+    mainFields: ['main', 'module'] // Prefer main field over module for better Node.js compatibility
   },
   module: {
     rules: [
@@ -38,7 +45,11 @@ const extensionConfig = {
           }
         ]
       }
-    ]
+    ],
+    // Handle the Prettier dynamic import warnings
+    unknownContextCritical: false,
+    unknownContextRegExp: /prettier/,
+    unknownContextRequest: ".",
   },
   devtool: 'nosources-source-map',
   infrastructureLogging: {

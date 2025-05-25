@@ -12,6 +12,7 @@ import { HtmlFormatter } from "./formatters/html-formatter";
 import { PythonFormatter } from "./formatters/python-formatter";
 import { MarkdownFormatter } from "./formatters/markdown-formatter";
 import { YamlFormatter } from "./formatters/yaml-formatter";
+import { UniversalFormatter } from "./formatters/universal-formatter";
 import {
   IConfigurationService,
   ILoggingService,
@@ -118,9 +119,11 @@ export async function activate(
  * **Register all available formatters**
  */
 async function registerFormatters(): Promise<void> {
-  const { formatService, loggingService } = extensionContext;
+  const { formatService, loggingService, configService } = extensionContext;
 
   try {
+    const config = configService.getConfig();
+    
     // **Register built-in formatters**
     formatService.registerFormatter(new JavaScriptFormatter());
     formatService.registerFormatter(new JsonFormatter());
@@ -129,6 +132,38 @@ async function registerFormatters(): Promise<void> {
     formatService.registerFormatter(new PythonFormatter());
     formatService.registerFormatter(new MarkdownFormatter());
     formatService.registerFormatter(new YamlFormatter());
+
+    // **Register Universal Formatter with configuration-based discovery**
+    if (config.enableAutoFormatterDiscovery) {
+      const universalFormatter = new UniversalFormatter();
+      formatService.registerFormatter(universalFormatter);
+      
+      // **Perform initial scan if enabled**
+      if (config.formatterScanOnStartup) {
+        loggingService.info("🔍 Starting automatic formatter discovery...");
+        
+        await universalFormatter.refreshLanguageSupport();
+        
+        const discoveredLanguages = await universalFormatter.getDiscoveredLanguages();
+        loggingService.info(`🔍 Discovered ${discoveredLanguages.length} language formatters: ${discoveredLanguages.join(', ')}`);
+        
+        if (config.showFormatterSuggestions && discoveredLanguages.length > 0) {
+          vscode.window.showInformationMessage(
+            `Format Master discovered ${discoveredLanguages.length} additional formatters!`,
+            'View Languages',
+            'Don\'t Show Again'
+          ).then(result => {
+            if (result === 'View Languages') {
+              vscode.commands.executeCommand('formatMaster.showDiscoveredLanguages');
+            } else if (result === 'Don\'t Show Again') {
+              vscode.workspace.getConfiguration('formatMaster').update('showFormatterSuggestions', false, true);
+            }
+          });
+        }
+      }
+    } else {
+      loggingService.info("📝 Automatic formatter discovery disabled");
+    }
 
     loggingService.info("📝 All formatters registered successfully");
   } catch (error) {
@@ -272,6 +307,38 @@ async function registerCommands(
       }
     );
 
+    // **Smart Format Document Command**
+    const smartFormatDocumentCommand = vscode.commands.registerCommand(
+      "formatMaster.smartFormatDocument",
+      async () => {
+        await executeSmartFormatDocument();
+      }
+    );
+
+    // **Detect and Install Formatters Command**
+    const detectFormattersCommand = vscode.commands.registerCommand(
+      "formatMaster.detectFormatters",
+      async () => {
+        await detectAndSuggestFormatters();
+      }
+    );
+
+    // **Refresh Language Support Command**
+    const refreshLanguageSupportCommand = vscode.commands.registerCommand(
+      "formatMaster.refreshLanguageSupport",
+      async () => {
+        await refreshLanguageSupport();
+      }
+    );
+
+    // **Show Discovered Languages Command**
+    const showDiscoveredLanguagesCommand = vscode.commands.registerCommand(
+      "formatMaster.showDiscoveredLanguages",
+      async () => {
+        await showDiscoveredLanguages();
+      }
+    );
+
     context.subscriptions.push(
       formatDocumentCommand,
       formatSelectionCommand,
@@ -283,7 +350,11 @@ async function registerCommands(
       importConfigCommand,
       formatWorkspaceCommand,
       performanceMetricsCommand,
-      showStatusCommand
+      showStatusCommand,
+      smartFormatDocumentCommand,
+      detectFormattersCommand,
+      refreshLanguageSupportCommand,
+      showDiscoveredLanguagesCommand
     );
 
     loggingService.info("⌨️ All commands registered successfully");
@@ -1077,5 +1148,249 @@ export function deactivate(): void {
     extensionContext?.dispose();
   } catch (error) {
     console.error("Error during deactivation:", error);
+  }
+}
+
+/**
+ * **Execute smart format document command**
+ */
+async function executeSmartFormatDocument(): Promise<void> {
+  const { loggingService, formatService, performanceService } = extensionContext;
+  const editor = vscode.window.activeTextEditor;
+
+  if (!editor) {
+    vscode.window.showWarningMessage("No active editor found");
+    return;
+  }
+
+  try {
+    loggingService.info("Smart formatting document...");
+    
+    const startTime = Date.now();
+    const edits = await formatService.smartFormatDocument(editor.document);
+    const duration = Date.now() - startTime;
+
+    // **Record performance metrics**
+    performanceService.recordFormatOperation(
+      editor.document.languageId,
+      duration,
+      edits.length > 0
+    );
+
+    if (edits.length > 0) {
+      const success = await editor.edit((editBuilder) => {
+        for (const edit of edits) {
+          editBuilder.replace(edit.range, edit.newText);
+        }
+      });
+
+      if (success) {
+        loggingService.info(`Smart document formatted (${edits.length} changes)`);
+        vscode.window.showInformationMessage(
+          `Document smart formatted (${edits.length} changes)`
+        );
+        updateStatusBar();
+      } else {
+        throw new Error("Failed to apply smart formatting changes");
+      }
+    } else {
+      vscode.window.showInformationMessage("Document is already properly formatted");
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    
+    // **Record failed operation**
+    performanceService.recordFormatOperation(
+      editor.document.languageId,
+      0,
+      false
+    );
+    
+    loggingService.error("Smart format document failed", error);
+    
+    // **If it's an unsupported language error, try to suggest formatters**
+    if (message.includes("not supported")) {
+      await detectAndSuggestFormatters();
+    } else {
+      vscode.window.showErrorMessage(`Smart formatting failed: ${message}`);
+    }
+  }
+}
+
+/**
+ * **Detect and suggest formatters for current language**
+ */
+async function detectAndSuggestFormatters(): Promise<void> {
+  const { loggingService, formatService } = extensionContext;
+  const editor = vscode.window.activeTextEditor;
+
+  if (!editor) {
+    vscode.window.showWarningMessage("No active editor found");
+    return;
+  }
+
+  const languageId = editor.document.languageId;
+  
+  try {
+    loggingService.info(`Detecting formatters for ${languageId}...`);
+    
+    // **Get integration service**
+    const integrationService = formatService.getIntegrationService();
+    
+    // **Try to detect built-in formatter**
+    const formatterInfo = await integrationService.detectBuiltInFormatter(languageId);
+    
+    // **Get all supported languages**
+    const supportedLanguages = formatService.getSupportedLanguages();
+    
+    let message = `Formatter Detection Results for ${languageId}:\n\n`;
+    
+    if (formatterInfo.available) {
+      message += `✅ Built-in formatter: Available`;
+      if (formatterInfo.extension) {
+        message += ` (${formatterInfo.extension})`;
+      }
+      message += `\n`;
+    } else {
+      message += `❌ Built-in formatter: Not available\n`;
+    }
+    
+    const hasCustomFormatter = supportedLanguages.includes(languageId);
+    if (hasCustomFormatter) {
+      message += `✅ Format Master formatter: Available\n`;
+    } else {
+      message += `❌ Format Master formatter: Not available\n`;
+    }
+    
+    message += `\nTotal supported languages: ${supportedLanguages.length}`;
+    
+    // **Show detection results**
+    const result = await vscode.window.showInformationMessage(
+      message,
+      { modal: true },
+      'View Supported Languages',
+      'Search Extensions'
+    );
+    
+    if (result === 'View Supported Languages') {
+      await showSupportedLanguages(supportedLanguages);
+    } else if (result === 'Search Extensions') {
+      vscode.commands.executeCommand('workbench.extensions.search', `@category:"formatters" ${languageId}`);
+    }
+    
+  } catch (error) {
+    loggingService.error("Formatter detection failed", error);
+    vscode.window.showErrorMessage(
+      `Formatter detection failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
+
+/**
+ * **Show list of supported languages**
+ */
+async function showSupportedLanguages(supportedLanguages: string[]): Promise<void> {
+  const languageList = supportedLanguages.sort().join(', ');
+  
+  const message = `Format Master supports ${supportedLanguages.length} languages:\n\n${languageList}`;
+  
+  vscode.window.showInformationMessage(
+    message,
+    { modal: true },
+    'Copy List'
+  ).then(result => {
+    if (result === 'Copy List') {
+      vscode.env.clipboard.writeText(languageList);
+      vscode.window.showInformationMessage('Language list copied to clipboard');
+    }
+  });
+}
+
+/**
+ * **Refresh language support by re-scanning formatters**
+ */
+async function refreshLanguageSupport(): Promise<void> {
+  const { formatService, loggingService } = extensionContext;
+
+  try {
+    loggingService.info("🔄 Refreshing language support...");
+    
+    vscode.window.withProgress({
+      location: vscode.ProgressLocation.Notification,
+      title: "Refreshing language support...",
+      cancellable: false
+    }, async (progress) => {
+      progress.report({ increment: 0 });
+      
+      // Refresh language support in format service
+      await formatService.refreshLanguageSupport();
+      progress.report({ increment: 50 });
+      
+      // Get updated discovered languages
+      const discoveredLanguages = await formatService.getDiscoveredLanguages();
+      progress.report({ increment: 100 });
+      
+      const message = `Language support refreshed! Discovered ${discoveredLanguages.length} formatters.`;
+      loggingService.info(message);
+      vscode.window.showInformationMessage(message);
+    });
+    
+  } catch (error) {
+    const message = `Failed to refresh language support: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    loggingService.error("Refresh language support failed", error);
+    vscode.window.showErrorMessage(message);
+  }
+}
+
+/**
+ * **Show all discovered languages with formatters**
+ */
+async function showDiscoveredLanguages(): Promise<void> {
+  const { formatService, loggingService } = extensionContext;
+
+  try {
+    loggingService.info("📋 Showing discovered languages...");
+    
+    const discoveredLanguages = await formatService.getDiscoveredLanguages();
+    const supportedLanguages = formatService.getSupportedLanguages();
+    
+    if (discoveredLanguages.length === 0) {
+      vscode.window.showInformationMessage(
+        "No formatters discovered. Try refreshing language support.",
+        'Refresh Now'
+      ).then(result => {
+        if (result === 'Refresh Now') {
+          vscode.commands.executeCommand('formatMaster.refreshLanguageSupport');
+        }
+      });
+      return;
+    }
+    
+    const discoveredList = discoveredLanguages.sort().join(', ');
+    const totalSupported = supportedLanguages.length;
+    
+    const message = `Format Master discovered ${discoveredLanguages.length} formatters:\n\n${discoveredList}\n\nTotal supported languages: ${totalSupported}`;
+    
+    const result = await vscode.window.showInformationMessage(
+      message,
+      { modal: true },
+      'Copy List',
+      'Refresh Support',
+      'Show All Supported'
+    );
+    
+    if (result === 'Copy List') {
+      await vscode.env.clipboard.writeText(discoveredList);
+      vscode.window.showInformationMessage('Discovered languages copied to clipboard');
+    } else if (result === 'Refresh Support') {
+      await vscode.commands.executeCommand('formatMaster.refreshLanguageSupport');
+    } else if (result === 'Show All Supported') {
+      await showSupportedLanguages(supportedLanguages);
+    }
+    
+  } catch (error) {
+    const message = `Failed to show discovered languages: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    loggingService.error("Show discovered languages failed", error);
+    vscode.window.showErrorMessage(message);
   }
 }

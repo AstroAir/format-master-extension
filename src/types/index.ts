@@ -26,6 +26,13 @@ export interface FormatConfig {
   statusBarIntegration: boolean;
   diagnosticsLevel: DiagnosticLevel;
   languageSpecific: Record<string, LanguageConfig>;
+  
+  // **Universal formatter scanning options**
+  enableAutoFormatterDiscovery: boolean;
+  formatterScanOnStartup: boolean;
+  formatterScanCacheTimeout: number; // minutes
+  showFormatterSuggestions: boolean;
+  autoRefreshLanguageSupport: boolean;
 }
 
 /**
@@ -233,6 +240,18 @@ export interface IFormatService {
   ): Promise<vscode.TextEdit[]>;
   registerFormatter(formatter: IFormatter): void;
   getFormatter(languageId: string): IFormatter | undefined;
+    // **Enhanced formatting methods**
+  smartFormatDocument(
+    document: vscode.TextDocument,
+    options?: FormatOptions
+  ): Promise<vscode.TextEdit[]>;
+  getSupportedLanguages(): string[];
+  getIntegrationService(): any; // FormatterIntegrationService type would be circular
+  
+  // **Dynamic language support methods**
+  refreshLanguageSupport(): Promise<void>;
+  getDiscoveredLanguages(): Promise<string[]>;
+  checkLanguageSupport(languageId: string): Promise<boolean>;
 }
 
 /**

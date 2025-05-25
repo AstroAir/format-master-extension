@@ -116,6 +116,30 @@
         "title": "Show Performance Metrics",
         "category": "Format Master",
         "icon": "$(graph)"
+      },
+      {
+        "command": "formatMaster.smartFormatDocument",
+        "title": "Smart Format Document",
+        "category": "Format Master",
+        "icon": "$(wand)"
+      },
+      {
+        "command": "formatMaster.detectFormatters",
+        "title": "Detect and Suggest Formatters",
+        "category": "Format Master",
+        "icon": "$(search-fuzzy)"
+      },
+      {
+        "command": "formatMaster.refreshLanguageSupport",
+        "title": "Refresh Language Support",
+        "category": "Format Master",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "formatMaster.showDiscoveredLanguages",
+        "title": "Show Discovered Languages",
+        "category": "Format Master",
+        "icon": "$(list-unordered)"
       }
     ],
     "keybindings": [
@@ -362,6 +386,33 @@
               }
             }
           }
+        },
+        "formatMaster.enableAutoFormatterDiscovery": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable automatic discovery of VS Code formatter providers"
+        },
+        "formatMaster.formatterScanOnStartup": {
+          "type": "boolean",
+          "default": true,
+          "description": "Scan for available formatters when the extension starts"
+        },
+        "formatMaster.formatterScanCacheTimeout": {
+          "type": "number",
+          "default": 30,
+          "minimum": 1,
+          "maximum": 1440,
+          "description": "Cache timeout for formatter scan results (in minutes)"
+        },
+        "formatMaster.showFormatterSuggestions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show notifications when new formatters are discovered"
+        },
+        "formatMaster.autoRefreshLanguageSupport": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically refresh language support when extensions are installed/uninstalled"
         }
       }
     }
