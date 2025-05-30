@@ -1,10 +1,19 @@
 import { BaseFormatter } from "./base-formatter";
-import { FormatOptions, FormatResult } from "../types";
+import {
+  FormatOptions,
+  FormatResult,
+  FormatOptionDescriptor,
+  ValidationResult,
+  DiagnosticLevel,
+  ValidationError,
+} from "../types";
 
 /**
  * **Formatter for JSON files**
  */
 export class JsonFormatter extends BaseFormatter {
+  public readonly name = "JSON Formatter";
+  public readonly priority = 1;
   public readonly supportedLanguages = ["json", "jsonc"];
 
   /**
@@ -56,12 +65,12 @@ export class JsonFormatter extends BaseFormatter {
    * **Get the indentation string based on options**
    */
   private getIndentString(options: FormatOptions): string {
-    if (options.useTabs) {
+    if (!options.insertSpaces) {
       return "\t";
     }
 
-    const indentSize = options.tabSize || options.indentSize || 2;
-    return " ".repeat(indentSize);
+    const tabSize = options.tabSize || 2;
+    return " ".repeat(tabSize);
   }
 
   /**
@@ -121,5 +130,74 @@ export class JsonFormatter extends BaseFormatter {
     }
 
     return lines.join("\n");
+  }
+
+  public async format(
+    text: string,
+    options: FormatOptions
+  ): Promise<FormatResult> {
+    return this.formatText(text, options);
+  }
+
+  public getSupportedOptions(): FormatOptionDescriptor[] {
+    return [
+      {
+        name: "tabSize",
+        type: "number",
+        description: "Number of spaces per indentation level",
+        default: 2,
+        required: false,
+      },
+      {
+        name: "insertSpaces",
+        type: "boolean",
+        description: "Use spaces for indentation",
+        default: true,
+        required: false,
+      },
+    ];
+  }
+
+  public getVersion(): string {
+    return "1.0.0";
+  }
+
+  public async validateSyntax(
+    content: string,
+    languageId: string
+  ): Promise<ValidationResult> {
+    try {
+      if (languageId === "jsonc") {
+        const { text } = this.extractComments(content);
+        JSON.parse(text);
+      } else {
+        JSON.parse(content);
+      }
+      return {
+        isValid: true,
+        errors: [],
+        warnings: [],
+        suggestions: [],
+        executionTime: 0,
+      };
+    } catch (error) {
+      return {
+        isValid: false,
+        errors: [
+          {
+            message:
+              error instanceof Error ? error.message : "Invalid JSON syntax",
+            line: 0,
+            column: 0,
+            severity: DiagnosticLevel.ERROR,
+            code: "INVALID_JSON",
+            source: this.name,
+          },
+        ],
+        warnings: [],
+        suggestions: [],
+        executionTime: 0,
+      };
+    }
   }
 }

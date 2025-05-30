@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { PerformanceMetrics, LanguageMetrics, ILoggingService } from "../types";
+import { ILoggingService, PerformanceMetrics, LanguageMetrics } from "../types";
 
 /**
  * **Service for monitoring and tracking formatting performance metrics**
@@ -13,7 +13,7 @@ export class PerformanceMonitoringService {
     errorCount: 0,
     cacheHitRate: 0,
     memoryUsage: 0,
-    languageBreakdown: {}
+    languageBreakdown: {},
   };
   private sessionStart: Date;
   private enabled: boolean = false;
@@ -21,13 +21,13 @@ export class PerformanceMonitoringService {
   constructor(private loggingService: ILoggingService) {
     this.sessionStart = new Date();
     this.resetMetrics();
-    
+
     // **Listen for configuration changes**
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration("formatMaster.performanceMonitoring")) {
         const config = vscode.workspace.getConfiguration("formatMaster");
         this.enabled = config.get<boolean>("performanceMonitoring", false);
-        
+
         if (this.enabled) {
           this.loggingService.info("Performance monitoring enabled");
         }
@@ -55,7 +55,7 @@ export class PerformanceMonitoringService {
 
     // **Update overall metrics**
     this.metrics.totalFormatOperations++;
-    
+
     if (success) {
       this.updateAverageFormatTime(executionTime);
       this.metrics.lastFormatTime = executionTime;
@@ -74,10 +74,11 @@ export class PerformanceMonitoringService {
     this.updateSuccessRate();
 
     // **Log performance data if execution time is notable**
-    if (executionTime > 1000) { // **Over 1 second**
+    if (executionTime > 1000) {
+      // **Over 1 second**
       this.loggingService.warn(
         `Slow formatting operation: ${languageId} took ${executionTime}ms` +
-        (fileSizeKB ? ` (file size: ${fileSizeKB}KB)` : '')
+          (fileSizeKB ? ` (file size: ${fileSizeKB}KB)` : "")
       );
     }
 
@@ -98,7 +99,8 @@ export class PerformanceMonitoringService {
     try {
       // **Get memory usage if available**
       const memUsage = process.memoryUsage();
-      this.metrics.memoryUsage = Math.round(memUsage.heapUsed / 1024 / 1024 * 100) / 100; // **MB**
+      this.metrics.memoryUsage =
+        Math.round((memUsage.heapUsed / 1024 / 1024) * 100) / 100; // **MB**
     } catch (error) {
       // **Memory usage not available in this environment**
     }
@@ -122,7 +124,9 @@ export class PerformanceMonitoringService {
   /**
    * **Get top performing languages**
    */
-  getTopPerformingLanguages(limit: number = 5): Array<{ language: string; metrics: LanguageMetrics }> {
+  getTopPerformingLanguages(
+    limit: number = 5
+  ): Array<{ language: string; metrics: LanguageMetrics }> {
     const entries = Object.entries(this.metrics.languageBreakdown)
       .map(([language, metrics]) => ({ language, metrics }))
       .sort((a, b) => a.metrics.averageTime - b.metrics.averageTime)
@@ -134,7 +138,9 @@ export class PerformanceMonitoringService {
   /**
    * **Get slowest performing languages**
    */
-  getSlowestPerformingLanguages(limit: number = 5): Array<{ language: string; metrics: LanguageMetrics }> {
+  getSlowestPerformingLanguages(
+    limit: number = 5
+  ): Array<{ language: string; metrics: LanguageMetrics }> {
     const entries = Object.entries(this.metrics.languageBreakdown)
       .map(([language, metrics]) => ({ language, metrics }))
       .sort((a, b) => b.metrics.averageTime - a.metrics.averageTime)
@@ -155,10 +161,10 @@ export class PerformanceMonitoringService {
       errorCount: 0,
       cacheHitRate: 0,
       memoryUsage: 0,
-      languageBreakdown: {}
+      languageBreakdown: {},
     };
     this.sessionStart = new Date();
-    
+
     if (this.enabled) {
       this.loggingService.info("Performance metrics reset");
     }
@@ -189,13 +195,16 @@ export class PerformanceMonitoringService {
         exported: new Date().toISOString(),
         sessionStart: this.sessionStart.toISOString(),
         sessionDuration: Date.now() - this.sessionStart.getTime(),
-        metrics: this.getMetrics()
-      }
+        metrics: this.getMetrics(),
+      },
     };
 
     try {
-      const fs = await import('fs');
-      await fs.promises.writeFile(filePath, JSON.stringify(exportData, null, 2));
+      const fs = await import("fs");
+      await fs.promises.writeFile(
+        filePath,
+        JSON.stringify(exportData, null, 2)
+      );
       this.loggingService.info(`Performance metrics exported to: ${filePath}`);
     } catch (error) {
       this.loggingService.error("Failed to export performance metrics", error);
@@ -208,8 +217,10 @@ export class PerformanceMonitoringService {
    */
   generateReport(): string {
     const metrics = this.getMetrics();
-    const sessionDuration = Math.round((Date.now() - this.sessionStart.getTime()) / 1000 / 60); // **Minutes**
-    
+    const sessionDuration = Math.round(
+      (Date.now() - this.sessionStart.getTime()) / 1000 / 60
+    ); // **Minutes**
+
     const report = [
       "# Format Master Performance Report",
       "",
@@ -221,19 +232,24 @@ export class PerformanceMonitoringService {
       `**Memory Usage:** ${metrics.memoryUsage.toFixed(1)} MB`,
       "",
       "## Language Breakdown",
-      ""
+      "",
     ];
 
     // **Add language-specific metrics**
-    const languageEntries = Object.entries(metrics.languageBreakdown)
-      .sort((a, b) => b[1].operationCount - a[1].operationCount);
+    const languageEntries = Object.entries(metrics.languageBreakdown).sort(
+      (a, b) => b[1].operationCount - a[1].operationCount
+    );
 
     if (languageEntries.length === 0) {
       report.push("No language-specific data available.");
     } else {
-      report.push("| Language | Operations | Avg Time (ms) | Error Count | Last Used |");
-      report.push("|----------|------------|---------------|-------------|-----------|");
-      
+      report.push(
+        "| Language | Operations | Avg Time (ms) | Error Count | Last Used |"
+      );
+      report.push(
+        "|----------|------------|---------------|-------------|-----------|"
+      );
+
       for (const [language, langMetrics] of languageEntries) {
         const lastUsed = langMetrics.lastUsed.toLocaleDateString();
         report.push(
@@ -248,19 +264,27 @@ export class PerformanceMonitoringService {
 
     // **Add insights**
     if (metrics.averageFormatTime > 500) {
-      report.push("⚠️ **Warning:** Average formatting time is high. Consider enabling incremental formatting for large files.");
+      report.push(
+        "⚠️ **Warning:** Average formatting time is high. Consider enabling incremental formatting for large files."
+      );
     }
 
     if (metrics.errorCount > metrics.totalFormatOperations * 0.1) {
-      report.push("⚠️ **Warning:** High error rate detected. Check formatter configurations and file syntax.");
+      report.push(
+        "⚠️ **Warning:** High error rate detected. Check formatter configurations and file syntax."
+      );
     }
 
     if (metrics.cacheHitRate < 20 && metrics.totalFormatOperations > 20) {
-      report.push("💡 **Tip:** Low cache hit rate. Consider formatting similar files to improve performance.");
+      report.push(
+        "💡 **Tip:** Low cache hit rate. Consider formatting similar files to improve performance."
+      );
     }
 
     if (metrics.memoryUsage > 100) {
-      report.push("⚠️ **Warning:** High memory usage detected. Consider restarting VS Code if performance degrades.");
+      report.push(
+        "⚠️ **Warning:** High memory usage detected. Consider restarting VS Code if performance degrades."
+      );
     }
 
     // **Add top and bottom performers**
@@ -271,7 +295,9 @@ export class PerformanceMonitoringService {
       report.push("");
       report.push("### Fastest Languages");
       for (const { language, metrics } of topPerformers) {
-        report.push(`- **${language}:** ${metrics.averageTime.toFixed(1)}ms average`);
+        report.push(
+          `- **${language}:** ${metrics.averageTime.toFixed(1)}ms average`
+        );
       }
     }
 
@@ -279,7 +305,9 @@ export class PerformanceMonitoringService {
       report.push("");
       report.push("### Slowest Languages");
       for (const { language, metrics } of slowestPerformers) {
-        report.push(`- **${language}:** ${metrics.averageTime.toFixed(1)}ms average`);
+        report.push(
+          `- **${language}:** ${metrics.averageTime.toFixed(1)}ms average`
+        );
       }
     }
 
@@ -298,10 +326,14 @@ export class PerformanceMonitoringService {
    */
   async setEnabled(enabled: boolean): Promise<void> {
     this.enabled = enabled;
-    
+
     const config = vscode.workspace.getConfiguration("formatMaster");
-    await config.update("performanceMonitoring", enabled, vscode.ConfigurationTarget.Workspace);
-    
+    await config.update(
+      "performanceMonitoring",
+      enabled,
+      vscode.ConfigurationTarget.Workspace
+    );
+
     if (enabled) {
       this.loggingService.info("Performance monitoring enabled");
     } else {
@@ -312,32 +344,42 @@ export class PerformanceMonitoringService {
   // **Private helper methods**
 
   private updateAverageFormatTime(newTime: number): void {
-    const successfulOps = this.metrics.totalFormatOperations - this.metrics.errorCount;
+    const successfulOps =
+      this.metrics.totalFormatOperations - this.metrics.errorCount;
     const currentTotal = this.metrics.averageFormatTime * (successfulOps - 1);
     this.metrics.averageFormatTime = (currentTotal + newTime) / successfulOps;
   }
 
   private updateSuccessRate(): void {
     if (this.metrics.totalFormatOperations > 0) {
-      const successfulOps = this.metrics.totalFormatOperations - this.metrics.errorCount;
-      this.metrics.successRate = (successfulOps / this.metrics.totalFormatOperations) * 100;
+      const successfulOps =
+        this.metrics.totalFormatOperations - this.metrics.errorCount;
+      this.metrics.successRate =
+        (successfulOps / this.metrics.totalFormatOperations) * 100;
     }
   }
 
   private updateCacheHitRate(): void {
     // **Simple cache hit tracking - in a real implementation this would be more sophisticated**
-    const currentHits = Math.round(this.metrics.cacheHitRate * this.metrics.totalFormatOperations / 100);
+    const currentHits = Math.round(
+      (this.metrics.cacheHitRate * this.metrics.totalFormatOperations) / 100
+    );
     const newHits = currentHits + 1;
-    this.metrics.cacheHitRate = (newHits / this.metrics.totalFormatOperations) * 100;
+    this.metrics.cacheHitRate =
+      (newHits / this.metrics.totalFormatOperations) * 100;
   }
 
-  private updateLanguageMetrics(languageId: string, executionTime: number, success: boolean): void {
+  private updateLanguageMetrics(
+    languageId: string,
+    executionTime: number,
+    success: boolean
+  ): void {
     if (!this.metrics.languageBreakdown[languageId]) {
       this.metrics.languageBreakdown[languageId] = {
         operationCount: 0,
         averageTime: 0,
         errorCount: 0,
-        lastUsed: new Date()
+        lastUsed: new Date(),
       };
     }
 
@@ -346,8 +388,10 @@ export class PerformanceMonitoringService {
     langMetrics.lastUsed = new Date();
 
     if (success) {
-      const currentTotal = langMetrics.averageTime * (langMetrics.operationCount - 1);
-      langMetrics.averageTime = (currentTotal + executionTime) / langMetrics.operationCount;
+      const currentTotal =
+        langMetrics.averageTime * (langMetrics.operationCount - 1);
+      langMetrics.averageTime =
+        (currentTotal + executionTime) / langMetrics.operationCount;
     } else {
       langMetrics.errorCount++;
     }
@@ -357,8 +401,8 @@ export class PerformanceMonitoringService {
     const metrics = this.getMetrics();
     this.loggingService.info(
       `Performance Summary: ${metrics.totalFormatOperations} operations, ` +
-      `${metrics.averageFormatTime.toFixed(1)}ms avg, ` +
-      `${metrics.successRate.toFixed(1)}% success rate`
+        `${metrics.averageFormatTime.toFixed(1)}ms avg, ` +
+        `${metrics.successRate.toFixed(1)}% success rate`
     );
   }
 }

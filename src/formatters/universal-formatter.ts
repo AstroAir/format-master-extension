@@ -1,6 +1,12 @@
 import * as vscode from "vscode";
 import { BaseFormatter } from "./base-formatter";
-import { FormatOptions, FormatResult } from "../types";
+import {
+  FormatOptions,
+  FormatResult,
+  FormatterPriority,
+  FormatOptionDescriptor,
+  ValidationResult,
+} from "../types";
 import { FormatError } from "../errors/format-error";
 
 /**
@@ -8,6 +14,8 @@ import { FormatError } from "../errors/format-error";
  * Used for languages not directly supported by Format Master
  */
 export class UniversalFormatter extends BaseFormatter {
+  public readonly name: string = "Universal";
+  public readonly priority: FormatterPriority = FormatterPriority.LOW;
   public readonly supportedLanguages: string[] = [];
   private readonly discoveredLanguages: Set<string> = new Set();
   private readonly providerCache: Map<string, boolean> = new Map();
@@ -31,12 +39,12 @@ export class UniversalFormatter extends BaseFormatter {
    */
   private async scanAvailableFormatters(): Promise<void> {
     const commonLanguages = this.getCommonLanguages();
-    
+
     for (const languageId of commonLanguages) {
       try {
         const hasProvider = await this.detectFormatterProvider(languageId);
         this.providerCache.set(languageId, hasProvider);
-        
+
         if (hasProvider) {
           this.discoveredLanguages.add(languageId);
         }
@@ -53,29 +61,79 @@ export class UniversalFormatter extends BaseFormatter {
   private getCommonLanguages(): string[] {
     return [
       // Web开发
-      'javascript', 'typescript', 'html', 'css', 'scss', 'sass', 'less',
-      'json', 'jsonc', 'xml', 'yaml', 'markdown',
-      
+      "javascript",
+      "typescript",
+      "html",
+      "css",
+      "scss",
+      "sass",
+      "less",
+      "json",
+      "jsonc",
+      "xml",
+      "yaml",
+      "markdown",
+
       // 系统编程
-      'c', 'cpp', 'csharp', 'go', 'rust', 'java', 'kotlin', 'swift',
-      
+      "c",
+      "cpp",
+      "csharp",
+      "go",
+      "rust",
+      "java",
+      "kotlin",
+      "swift",
+
       // 脚本语言
-      'python', 'ruby', 'php', 'perl', 'lua', 'r',
-      
+      "python",
+      "ruby",
+      "php",
+      "perl",
+      "lua",
+      "r",
+
       // 函数式语言
-      'haskell', 'scala', 'erlang', 'elixir', 'fsharp', 'ocaml', 'clojure',
-      
+      "haskell",
+      "scala",
+      "erlang",
+      "elixir",
+      "fsharp",
+      "ocaml",
+      "clojure",
+
       // Shell和配置
-      'shellscript', 'bash', 'zsh', 'fish', 'powershell', 'dockerfile',
-      'ini', 'toml', 'properties', 'env',
-      
+      "shellscript",
+      "bash",
+      "zsh",
+      "fish",
+      "powershell",
+      "dockerfile",
+      "ini",
+      "toml",
+      "properties",
+      "env",
+
       // 数据库
-      'sql', 'mysql', 'postgresql', 'sqlite',
-      
+      "sql",
+      "mysql",
+      "postgresql",
+      "sqlite",
+
       // 其他
-      'dart', 'vue', 'svelte', 'razor', 'handlebars', 'mustache',
-      'latex', 'bibtex', 'makefile', 'cmake', 'gradle',
-      'protobuf', 'graphql', 'prisma'
+      "dart",
+      "vue",
+      "svelte",
+      "razor",
+      "handlebars",
+      "mustache",
+      "latex",
+      "bibtex",
+      "makefile",
+      "cmake",
+      "gradle",
+      "protobuf",
+      "graphql",
+      "prisma",
     ];
   }
 
@@ -86,15 +144,17 @@ export class UniversalFormatter extends BaseFormatter {
     try {
       // 创建临时文档URI
       const extension = this.getFileExtension(languageId);
-      const tempUri = vscode.Uri.parse(`untitled:temp-${Date.now()}.${extension}`);
-      
+      const tempUri = vscode.Uri.parse(
+        `untitled:temp-${Date.now()}.${extension}`
+      );
+
       // 尝试执行格式化命令
       const edits = await vscode.commands.executeCommand<vscode.TextEdit[]>(
-        'vscode.executeFormatDocumentProvider',
+        "vscode.executeFormatDocumentProvider",
         tempUri,
         { insertSpaces: true, tabSize: 2 }
       );
-      
+
       return edits !== undefined;
     } catch {
       return false;
@@ -134,11 +194,11 @@ export class UniversalFormatter extends BaseFormatter {
     try {
       const hasProvider = await this.detectFormatterProvider(languageId);
       this.providerCache.set(languageId, hasProvider);
-      
+
       if (hasProvider) {
         this.discoveredLanguages.add(languageId);
       }
-      
+
       return hasProvider;
     } catch {
       this.providerCache.set(languageId, false);
@@ -172,42 +232,79 @@ export class UniversalFormatter extends BaseFormatter {
   /**
    * **Format text using VS Code's built-in formatter**
    */
-  async formatText(text: string, options: FormatOptions): Promise<FormatResult> {
+  public async format(
+    text: string,
+    options: FormatOptions
+  ): Promise<FormatResult> {
+    return this.formatText(text, options);
+  }
+
+  public getSupportedOptions(): FormatOptionDescriptor[] {
+    return [
+      {
+        name: "tabSize",
+        type: "number",
+        default: 2,
+        required: false,
+        description: "Number of spaces used for indentation",
+      },
+      {
+        name: "insertSpaces",
+        type: "boolean",
+        default: true,
+        required: false,
+        description: "Use spaces for indentation instead of tabs",
+      },
+    ];
+  }
+
+  public getVersion(): string {
+    return "1.0.0";
+  }
+
+  async formatText(
+    text: string,
+    options: FormatOptions
+  ): Promise<FormatResult> {
     try {
       // 首先检查是否支持该语言
       const isSupported = await this.isLanguageSupported(options.languageId);
       if (!isSupported) {
         return this.handleFormattingError(
-          new Error(`No formatter provider found for language: ${options.languageId}`),
+          new Error(
+            `No formatter provider found for language: ${options.languageId}`
+          ),
           options
         );
       }
 
       const preprocessedText = this.preprocess(text, options);
-      
+
       // **Create a temporary document for formatting**
-      const tempUri = vscode.Uri.parse(`untitled:temp-${Date.now()}.${this.getFileExtension(options.languageId)}`);
-      
+      const tempUri = vscode.Uri.parse(
+        `untitled:temp-${Date.now()}.${this.getFileExtension(options.languageId)}`
+      );
+
       // **Create a text document with the content**
       const document = await vscode.workspace.openTextDocument({
         language: options.languageId,
-        content: preprocessedText
+        content: preprocessedText,
       });
 
       // **Try to execute built-in formatter**
       const edits = await vscode.commands.executeCommand<vscode.TextEdit[]>(
-        'vscode.executeFormatDocumentProvider',
+        "vscode.executeFormatDocumentProvider",
         document.uri,
         {
-          insertSpaces: !options.useTabs,
-          tabSize: options.tabSize || 2
+          insertSpaces: options.insertSpaces !== false,
+          tabSize: options.tabSize || 2,
         }
       );
 
       if (edits && edits.length > 0) {
         // **Apply edits to get formatted text**
         let formattedText = preprocessedText;
-        
+
         // **Sort edits by position (reverse order for proper application)**
         const sortedEdits = edits.sort((a, b) => {
           const posA = a.range.start.line * 1000000 + a.range.start.character;
@@ -216,12 +313,18 @@ export class UniversalFormatter extends BaseFormatter {
         });
 
         for (const edit of sortedEdits) {
-          const startOffset = this.getOffsetFromPosition(formattedText, edit.range.start);
-          const endOffset = this.getOffsetFromPosition(formattedText, edit.range.end);
-          
-          formattedText = 
-            formattedText.substring(0, startOffset) + 
-            edit.newText + 
+          const startOffset = this.getOffsetFromPosition(
+            formattedText,
+            edit.range.start
+          );
+          const endOffset = this.getOffsetFromPosition(
+            formattedText,
+            edit.range.end
+          );
+
+          formattedText =
+            formattedText.substring(0, startOffset) +
+            edit.newText +
             formattedText.substring(endOffset);
         }
 
@@ -235,9 +338,8 @@ export class UniversalFormatter extends BaseFormatter {
       // **No edits returned - document might already be formatted**
       const finalText = this.postprocess(preprocessedText, options);
       const normalizedText = this.normalizeIndentation(finalText, options);
-      
-      return this.createSuccessResult(normalizedText, 0);
 
+      return this.createSuccessResult(normalizedText, 0);
     } catch (error) {
       return this.handleFormattingError(error, options);
     }
@@ -246,15 +348,22 @@ export class UniversalFormatter extends BaseFormatter {
   /**
    * **Handle formatting errors**
    */
-  private handleFormattingError(error: unknown, options: FormatOptions): FormatResult {
-    const baseMessage = error instanceof Error ? error.message : "Unknown formatting error";
+  private handleFormattingError(
+    error: unknown,
+    options: FormatOptions
+  ): FormatResult {
+    const baseMessage =
+      error instanceof Error ? error.message : "Unknown formatting error";
     const errorType = error instanceof Error ? error.constructor.name : "Error";
-    
+
     let enhancedMessage = `Universal Formatter Error (${errorType}): ${baseMessage}`;
     enhancedMessage += `\nLanguage: ${options.languageId}`;
-    
+
     // **Add specific error suggestions**
-    if (baseMessage.includes("No provider") || baseMessage.includes("No formatter")) {
+    if (
+      baseMessage.includes("No provider") ||
+      baseMessage.includes("No formatter")
+    ) {
       enhancedMessage += `\nNo built-in formatter provider found for ${options.languageId}.`;
       enhancedMessage += `\nSuggestions:`;
       enhancedMessage += `\n  - Install a formatter extension for ${options.languageId}`;
@@ -263,18 +372,14 @@ export class UniversalFormatter extends BaseFormatter {
     } else if (baseMessage.includes("timeout")) {
       enhancedMessage += `\nFormatter timed out. Try again or check your configuration.`;
     }
-    
+
     const formattingError = new FormatError(
       enhancedMessage,
       options.languageId,
       error instanceof Error ? error : undefined
     );
-    
-    return {
-      success: false,
-      text: undefined,
-      error: formattingError
-    };
+
+    return this.createErrorResult(formattingError);
   }
 
   /**
@@ -296,7 +401,7 @@ export class UniversalFormatter extends BaseFormatter {
       yaml: "yaml",
       yml: "yml",
       markdown: "md",
-      
+
       // 系统编程
       python: "py",
       java: "java",
@@ -308,14 +413,14 @@ export class UniversalFormatter extends BaseFormatter {
       swift: "swift",
       kotlin: "kt",
       scala: "scala",
-      
+
       // 脚本语言
       php: "php",
       ruby: "rb",
       perl: "pl",
       lua: "lua",
       r: "r",
-      
+
       // 函数式语言
       haskell: "hs",
       erlang: "erl",
@@ -323,7 +428,7 @@ export class UniversalFormatter extends BaseFormatter {
       fsharp: "fs",
       ocaml: "ml",
       clojure: "clj",
-      
+
       // Shell和配置
       shellscript: "sh",
       bash: "sh",
@@ -335,13 +440,13 @@ export class UniversalFormatter extends BaseFormatter {
       toml: "toml",
       properties: "properties",
       env: "env",
-      
+
       // 数据库
       sql: "sql",
       mysql: "sql",
       postgresql: "sql",
       sqlite: "sql",
-      
+
       // 其他
       dart: "dart",
       vue: "vue",
@@ -356,23 +461,26 @@ export class UniversalFormatter extends BaseFormatter {
       gradle: "gradle",
       protobuf: "proto",
       graphql: "graphql",
-      prisma: "prisma"
+      prisma: "prisma",
     };
-    
+
     return extensionMap[languageId] || "txt";
   }
 
   /**
    * **Convert position to offset in text**
    */
-  private getOffsetFromPosition(text: string, position: vscode.Position): number {
-    const lines = text.split('\n');
+  private getOffsetFromPosition(
+    text: string,
+    position: vscode.Position
+  ): number {
+    const lines = text.split("\n");
     let offset = 0;
-    
+
     for (let i = 0; i < position.line && i < lines.length; i++) {
       offset += lines[i].length + 1; // +1 for newline character
     }
-    
+
     return offset + position.character;
   }
 
@@ -400,7 +508,7 @@ export class UniversalFormatter extends BaseFormatter {
       totalLanguages: this.getCommonLanguages().length,
       supportedLanguages: [...this.supportedLanguages],
       discoveredLanguages: Array.from(this.discoveredLanguages),
-      cachedResults: this.providerCache.size
+      cachedResults: this.providerCache.size,
     };
   }
 
@@ -410,5 +518,19 @@ export class UniversalFormatter extends BaseFormatter {
   clearCache(): void {
     this.providerCache.clear();
     this.discoveredLanguages.clear();
+  }
+
+  public async validateSyntax(
+    content: string,
+    languageId: string
+  ): Promise<ValidationResult> {
+    // Universal formatter doesn't provide syntax validation
+    return {
+      isValid: true,
+      errors: [],
+      warnings: [],
+      suggestions: [],
+      executionTime: 0,
+    };
   }
 }

@@ -1,10 +1,21 @@
-import { IFormatter, FormatOptions, FormatResult } from "../types";
+import {
+  IFormatter,
+  FormatOptions,
+  FormatResult,
+  FormatterPriority,
+  ValidationResult,
+  ValidationError,
+  DiagnosticLevel,
+  FormatOptionDescriptor
+} from "../types";
 
 /**
  * **Abstract base class for all formatters**
  */
 export abstract class BaseFormatter implements IFormatter {
+  public abstract readonly name: string;
   public abstract readonly supportedLanguages: string[];
+  public abstract readonly priority: FormatterPriority;
 
   /**
    * **Check if this formatter can handle the given language**
@@ -20,6 +31,24 @@ export abstract class BaseFormatter implements IFormatter {
     text: string,
     options: FormatOptions
   ): Promise<FormatResult>;
+
+  /**
+   * **Format the given text or document**
+   */
+  public abstract format(
+    text: string,
+    options: FormatOptions
+  ): Promise<FormatResult>;
+
+  /**
+   * **Get supported formatting options**
+   */
+  public abstract getSupportedOptions(): FormatOptionDescriptor[];
+
+  /**
+   * **Get formatter version**
+   */
+  public abstract getVersion(): string;
 
   /**
    * **Common preprocessing for all formatters**
@@ -55,13 +84,13 @@ export abstract class BaseFormatter implements IFormatter {
    * **Convert tabs to spaces or vice versa**
    */
   protected normalizeIndentation(text: string, options: FormatOptions): string {
-    const tabSize = options.tabSize || options.indentSize || 2;
+    const tabSize = options.tabSize || 2;
 
-    if (options.insertSpaces !== false && !options.useTabs) {
+    if (options.insertSpaces) {
       // **Convert tabs to spaces**
       const spaces = " ".repeat(tabSize);
       return text.replace(/\t/g, spaces);
-    } else if (options.useTabs || options.insertSpaces === false) {
+    } else {
       // **Convert spaces to tabs**
       const spacePattern = new RegExp(`^( {${tabSize}})+`, "gm");
       return text.replace(spacePattern, (match) => {
@@ -82,8 +111,15 @@ export abstract class BaseFormatter implements IFormatter {
   ): FormatResult {
     return {
       success: true,
-      text,
-      changes,
+      edits: [],
+      errors: [],
+      warnings: [],
+      suggestions: [],
+      formatterUsed: this.name,
+      executionTime: 0,
+      linesProcessed: text.split('\n').length,
+      charactersProcessed: text.length,
+      fromCache: false
     };
   }
 
@@ -93,7 +129,30 @@ export abstract class BaseFormatter implements IFormatter {
   protected createErrorResult(error: Error): FormatResult {
     return {
       success: false,
-      error,
+      edits: [],
+      errors: [{
+        code: 'FORMAT_ERROR',
+        message: error.message,
+        line: 0,
+        column: 0,
+        severity: DiagnosticLevel.ERROR,
+        source: this.name
+      }],
+      warnings: [],
+      suggestions: [],
+      formatterUsed: this.name,
+      executionTime: 0,
+      linesProcessed: 0,
+      charactersProcessed: 0,
+      fromCache: false
     };
   }
+
+  /**
+   * **Validate syntax of the given text**
+   */
+  public abstract validateSyntax(
+    content: string,
+    languageId: string
+  ): Promise<ValidationResult>;
 }

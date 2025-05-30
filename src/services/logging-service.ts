@@ -1,15 +1,10 @@
 import * as vscode from "vscode";
-import { ILoggingService } from "../types";
-
-/**
- * **Logging levels**
- */
-export enum LogLevel {
-  DEBUG = 0,
-  INFO = 1,
-  WARN = 2,
-  ERROR = 3,
-}
+import {
+  ILoggingService,
+  DiagnosticLevel,
+  LogMessage,
+  LogFormat,
+} from "../types";
 
 /**
  * **Enhanced logging service options**
@@ -18,7 +13,7 @@ export interface LoggingServiceOptions {
   channelName?: string;
   enableTimestamps?: boolean;
   enableColors?: boolean;
-  initialLevel?: LogLevel;
+  initialLevel?: DiagnosticLevel;
   loadFromConfig?: boolean;
 }
 
@@ -26,16 +21,22 @@ export interface LoggingServiceOptions {
  * **Enhanced logging service with VS Code integration**
  */
 export class LoggingService implements ILoggingService {
+  private readonly _onLogMessage = new vscode.EventEmitter<LogMessage>();
+  readonly onLogMessage = this._onLogMessage.event;
+
   private outputChannel: vscode.OutputChannel;
-  private logLevel: LogLevel;
+  private logLevel: DiagnosticLevel;
   private readonly enableTimestamps: boolean;
   private readonly enableColors: boolean;
+  private timers: Map<string, number> = new Map();
+  private context: Record<string, any> = {};
+  private readonly source: string = "Format Master";
 
   constructor(options: LoggingServiceOptions = {}) {
     const channelName = options.channelName ?? "Format Master";
     this.enableTimestamps = options.enableTimestamps ?? true;
     this.enableColors = options.enableColors ?? true;
-    this.logLevel = options.initialLevel ?? LogLevel.INFO;
+    this.logLevel = options.initialLevel ?? DiagnosticLevel.INFO;
 
     this.outputChannel = vscode.window.createOutputChannel(channelName);
 
@@ -61,33 +62,33 @@ export class LoggingService implements ILoggingService {
 
     switch (level) {
       case "debug":
-        this.logLevel = LogLevel.DEBUG;
+        this.logLevel = DiagnosticLevel.DEBUG;
         break;
       case "info":
-        this.logLevel = LogLevel.INFO;
+        this.logLevel = DiagnosticLevel.INFO;
         break;
       case "warn":
-        this.logLevel = LogLevel.WARN;
+        this.logLevel = DiagnosticLevel.WARNING;
         break;
       case "error":
-        this.logLevel = LogLevel.ERROR;
+        this.logLevel = DiagnosticLevel.ERROR;
         break;
       default:
-        this.logLevel = LogLevel.INFO;
+        this.logLevel = DiagnosticLevel.INFO;
     }
   }
 
   /**
    * **Set the log level programmatically**
    */
-  setLogLevel(level: LogLevel): void {
+  setLogLevel(level: DiagnosticLevel): void {
     this.logLevel = level;
   }
 
   /**
    * **Get the current log level**
    */
-  getLogLevel(): LogLevel {
+  getLogLevel(): DiagnosticLevel {
     return this.logLevel;
   }
 
@@ -95,21 +96,42 @@ export class LoggingService implements ILoggingService {
    * **Log debug message**
    */
   debug(message: string, ...args: any[]): void {
-    this.log(LogLevel.DEBUG, message, ...args);
+    this.log(DiagnosticLevel.DEBUG, message, ...args);
+    this._onLogMessage.fire({
+      level: DiagnosticLevel.DEBUG,
+      message: this.formatMessage(message, args),
+      timestamp: new Date(),
+      source: this.source,
+      context: this.context,
+    });
   }
 
   /**
    * **Log info message**
    */
   info(message: string, ...args: any[]): void {
-    this.log(LogLevel.INFO, message, ...args);
+    this.log(DiagnosticLevel.INFO, message, ...args);
+    this._onLogMessage.fire({
+      level: DiagnosticLevel.INFO,
+      message: this.formatMessage(message, args),
+      timestamp: new Date(),
+      source: this.source,
+      context: this.context,
+    });
   }
 
   /**
    * **Log warning message**
    */
   warn(message: string, ...args: any[]): void {
-    this.log(LogLevel.WARN, message, ...args);
+    this.log(DiagnosticLevel.WARNING, message, ...args);
+    this._onLogMessage.fire({
+      level: DiagnosticLevel.WARNING,
+      message: this.formatMessage(message, args),
+      timestamp: new Date(),
+      source: this.source,
+      context: this.context,
+    });
   }
 
   /**
@@ -117,20 +139,55 @@ export class LoggingService implements ILoggingService {
    */
   error(message: string | Error, ...args: any[]): void {
     if (message instanceof Error) {
-      this.log(
-        LogLevel.ERROR,
-        message.message,
-        ...[{ stack: message.stack }, ...args]
-      );
+      const formattedMessage = this.formatMessage(message.message, [
+        { stack: message.stack },
+        ...args,
+      ]);
+      this.log(DiagnosticLevel.ERROR, formattedMessage);
+      this._onLogMessage.fire({
+        level: DiagnosticLevel.ERROR,
+        message: formattedMessage,
+        timestamp: new Date(),
+        source: this.source,
+        context: this.context,
+        error: message,
+      });
     } else {
-      this.log(LogLevel.ERROR, message, ...args);
+      this.log(DiagnosticLevel.ERROR, message, ...args);
+      this._onLogMessage.fire({
+        level: DiagnosticLevel.ERROR,
+        message: this.formatMessage(message, args),
+        timestamp: new Date(),
+        source: this.source,
+        context: this.context,
+      });
     }
+  }
+
+  private formatMessage(message: string, args: any[]): string {
+    let formatted = message;
+    if (args.length > 0) {
+      args.forEach((arg) => {
+        if (arg instanceof Error) {
+          formatted += `\n${arg.stack || arg.message}`;
+        } else if (typeof arg === "object") {
+          try {
+            formatted += `\n${JSON.stringify(arg, null, 2)}`;
+          } catch (e) {
+            formatted += `\n[Object that could not be stringified]`;
+          }
+        } else {
+          formatted += ` ${arg}`;
+        }
+      });
+    }
+    return formatted;
   }
 
   /**
    * **Internal logging implementation**
    */
-  private log(level: LogLevel, message: string, ...args: any[]): void {
+  private log(level: DiagnosticLevel, message: string, ...args: any[]): void {
     if (level < this.logLevel) {
       return;
     }
@@ -139,7 +196,7 @@ export class LoggingService implements ILoggingService {
       ? `[${new Date().toISOString()}] `
       : "";
 
-    const levelName = LogLevel[level];
+    const levelName = level.toUpperCase();
     const coloredLevel = this.enableColors
       ? this.colorizeLevel(levelName, level)
       : levelName;
@@ -168,9 +225,9 @@ export class LoggingService implements ILoggingService {
 
     // Also log to console in development mode
     if (process.env.NODE_ENV === "development") {
-      if (level >= LogLevel.ERROR) {
+      if (level === DiagnosticLevel.ERROR) {
         console.error(logMessage);
-      } else if (level >= LogLevel.WARN) {
+      } else if (level === DiagnosticLevel.WARNING) {
         console.warn(logMessage);
       } else {
         console.log(logMessage);
@@ -181,21 +238,22 @@ export class LoggingService implements ILoggingService {
   /**
    * **Apply visual indicators for log levels**
    */
-  private colorizeLevel(levelName: string, level: LogLevel): string {
+  private colorizeLevel(levelName: string, level: DiagnosticLevel): string {
     if (!this.enableColors) {
       return levelName;
     }
 
     // VS Code output panel doesn't support ANSI colors,
     // but we can add emoji indicators for visual distinction
-    const indicators = {
-      [LogLevel.DEBUG]: "🔍 ", // Magnifying glass
-      [LogLevel.INFO]: "ℹ️ ", // Information
-      [LogLevel.WARN]: "⚠️ ", // Warning
-      [LogLevel.ERROR]: "❌ ", // Error
-    };
+    const indicators = new Map<DiagnosticLevel, string>([
+      [DiagnosticLevel.DEBUG, "🔍 "], // Magnifying glass
+      [DiagnosticLevel.INFO, "ℹ️ "], // Information
+      [DiagnosticLevel.WARNING, "⚠️ "], // Warning
+      [DiagnosticLevel.ERROR, "❌ "], // Error
+      [DiagnosticLevel.OFF, "⭕ "], // Off
+    ]);
 
-    return `${indicators[level]}${levelName}`;
+    return `${indicators.get(level) || ""}${levelName}`;
   }
 
   /**
@@ -208,14 +266,61 @@ export class LoggingService implements ILoggingService {
   /**
    * **Clear the output channel**
    */
-  clear(): void {
+  clearLogs(): void {
     this.outputChannel.clear();
   }
 
+  startTimer(label: string): void {
+    this.timers.set(label, Date.now());
+  }
+
+  endTimer(label: string): void {
+    const startTime = this.timers.get(label);
+    if (startTime) {
+      const duration = Date.now() - startTime;
+      this.logPerformance(label, duration);
+      this.timers.delete(label);
+    }
+  }
+
+  logPerformance(
+    operation: string,
+    duration: number,
+    metadata?: Record<string, any>
+  ): void {
+    const perfData = {
+      operation,
+      duration,
+      timestamp: new Date(),
+      ...metadata,
+    };
+    this.info(`Performance: ${operation} took ${duration}ms`, perfData);
+  }
+
+  exportLogs(format?: LogFormat): Promise<string> {
+    return new Promise((resolve) => {
+      // For now, just return the raw content
+      const content = this.outputChannel.toString();
+      resolve(content);
+    });
+  }
+
+  withContext(context: Record<string, any>): ILoggingService {
+    const newLogger = new LoggingService({
+      channelName: this.outputChannel.name,
+      enableTimestamps: this.enableTimestamps,
+      enableColors: this.enableColors,
+      initialLevel: this.logLevel,
+    });
+    newLogger.context = { ...this.context, ...context };
+    return newLogger;
+  }
+
   /**
-   * **Dispose the output channel**
+   * **Dispose the output channel and event emitter**
    */
   dispose(): void {
+    this._onLogMessage.dispose();
     this.outputChannel.dispose();
   }
 }

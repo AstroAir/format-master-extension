@@ -1,19 +1,111 @@
 import * as vscode from "vscode";
 import * as prettier from "prettier";
 import { BaseFormatter } from "./base-formatter";
-import { FormatOptions, FormatResult } from "../types";
-import { FormatError } from "../errors/format-error"; // 导入自定义格式化错误类型
+import { FormatOptions, FormatResult, FormatterPriority, FormatOptionDescriptor, ValidationResult, DiagnosticLevel } from "../types";
+import { FormatError } from "../errors/format-error";
 
 /**
  * **Formatter for JavaScript and TypeScript files**
  */
 export class JavaScriptFormatter extends BaseFormatter {
+  public readonly name = "javascript";
+  public readonly priority = FormatterPriority.NORMAL;
   public readonly supportedLanguages = [
     "javascript",
     "typescript",
     "javascriptreact",
     "typescriptreact",
   ];
+
+  public async format(text: string, options: FormatOptions): Promise<FormatResult> {
+    return this.formatText(text, options);
+  }
+
+  public getSupportedOptions(): FormatOptionDescriptor[] {
+    return [
+      {
+        name: "tabSize",
+        type: "number",
+        default: 2,
+        required: false,
+        description: "Number of spaces for indentation",
+      },
+      {
+        name: "insertSpaces",
+        type: "boolean",
+        default: true,
+        required: false,
+        description: "Use spaces instead of tabs",
+      },
+      {
+        name: "maxLineLength",
+        type: "number",
+        default: 120,
+        required: false,
+        description: "Maximum line length",
+      },
+      {
+        name: "semi",
+        type: "boolean",
+        default: true,
+        required: false,
+        description: "Add semicolons at the end of statements",
+      },
+      {
+        name: "singleQuote",
+        type: "boolean",
+        default: false,
+        required: false,
+        description: "Use single quotes instead of double quotes",
+      }
+    ];
+  }
+
+  public getVersion(): string {
+    return "1.0.0";
+  }
+
+  public async validateSyntax(content: string, languageId: string): Promise<ValidationResult> {
+    try {
+      // Try parsing with Prettier to validate syntax
+      const parser = this.getParser(languageId);
+      await prettier.format(content, { parser });
+
+      return {
+        isValid: true,
+        errors: [],
+        warnings: [],
+        suggestions: [],
+        executionTime: 0
+      };
+    } catch (error) {
+      let line = 0;
+      let column = 0;
+      let message = error instanceof Error ? error.message : "Unknown error";
+
+      // Extract line and column from Prettier error message
+      const match = message.match(/\((\d+):(\d+)\)/);
+      if (match && match.length >= 3) {
+        line = parseInt(match[1]);
+        column = parseInt(match[2]);
+      }
+
+      return {
+        isValid: false,
+        errors: [{
+          code: "SYNTAX_ERROR",
+          message,
+          line,
+          column,
+          severity: DiagnosticLevel.ERROR,
+          source: this.name
+        }],
+        warnings: [],
+        suggestions: [],
+        executionTime: 0
+      };
+    }
+  }
 
   /**
    * **Format JavaScript/TypeScript code using Prettier**
@@ -31,8 +123,8 @@ export class JavaScriptFormatter extends BaseFormatter {
       // **Configure Prettier options**
       const prettierOptions: prettier.Options = {
         parser,
-        tabWidth: options.tabSize || options.indentSize || 2,
-        useTabs: options.useTabs || false,
+        tabWidth: options.tabSize || 2,
+        useTabs: !options.insertSpaces,
         printWidth: options.maxLineLength || 120,
         semi: true,
         singleQuote: false,
@@ -82,13 +174,19 @@ export class JavaScriptFormatter extends BaseFormatter {
       }
 
       // **If custom formatting failed and fallback is enabled**
-      if (useBuiltInFallback && result.error) {        console.warn(`Custom formatting failed for ${options.languageId}, trying built-in formatter`);
+      if (useBuiltInFallback && result.errors.length > 0) {
+        console.warn(
+          `Custom formatting failed for ${options.languageId}, trying built-in formatter`
+        );
         return await this.tryBuiltInFormatter(text, options);
       }
 
       return result;
     } catch (error) {
-      if (useBuiltInFallback) {        console.warn(`Custom formatting threw error for ${options.languageId}, trying built-in formatter`);
+      if (useBuiltInFallback) {
+        console.warn(
+          `Custom formatting threw error for ${options.languageId}, trying built-in formatter`
+        );
         return await this.tryBuiltInFormatter(text, options);
       }
 
@@ -114,7 +212,7 @@ export class JavaScriptFormatter extends BaseFormatter {
         "vscode.executeFormatDocumentProvider",
         tempUri,
         {
-          insertSpaces: !options.useTabs,
+          insertSpaces: options.insertSpaces,
           tabSize: options.tabSize || 2,
         }
       );
@@ -124,7 +222,10 @@ export class JavaScriptFormatter extends BaseFormatter {
         let formattedText = text;
         for (const edit of edits.reverse()) {
           // Apply in reverse order
-          const startOffset = this.getOffsetFromPosition(text, edit.range.start);
+          const startOffset = this.getOffsetFromPosition(
+            text,
+            edit.range.start
+          );
           const endOffset = this.getOffsetFromPosition(text, edit.range.end);
           formattedText =
             formattedText.substring(0, startOffset) +
@@ -132,28 +233,58 @@ export class JavaScriptFormatter extends BaseFormatter {
             formattedText.substring(endOffset);
         }
 
-        return this.createFormatterResult(formattedText, "builtin");
+        return {
+          success: true,
+          edits,
+          errors: [],
+          warnings: [],
+          suggestions: [],
+          formatterUsed: "builtin",
+          executionTime: 0,
+          linesProcessed: formattedText.split('\n').length,
+          charactersProcessed: formattedText.length,
+          fromCache: false
+        };
       }
 
       return {
         success: false,
-        text: undefined,
-        error: new FormatError(
-          "Built-in formatter returned no edits",
-          options.languageId
-        ),
+        edits: [],
+        errors: [{
+          code: "NO_EDITS",
+          message: "Built-in formatter returned no edits",
+          line: 0,
+          column: 0,
+          severity: DiagnosticLevel.ERROR,
+          source: this.name
+        }],
+        warnings: [],
+        suggestions: [],
+        formatterUsed: "builtin",
+        executionTime: 0,
+        linesProcessed: 0,
+        charactersProcessed: 0,
+        fromCache: false
       };
     } catch (error) {
       return {
         success: false,
-        text: undefined,
-        error: new FormatError(
-          `Built-in formatter failed: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`,
-          options.languageId,
-          error instanceof Error ? error : undefined
-        ),
+        edits: [],
+        errors: [{
+          code: "FORMATTER_ERROR",
+          message: `Built-in formatter failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+          line: 0,
+          column: 0,
+          severity: DiagnosticLevel.ERROR,
+          source: this.name
+        }],
+        warnings: [],
+        suggestions: [],
+        formatterUsed: "builtin",
+        executionTime: 0,
+        linesProcessed: 0,
+        charactersProcessed: 0,
+        fromCache: false
       };
     }
   }
@@ -233,19 +364,6 @@ export class JavaScriptFormatter extends BaseFormatter {
 
     return offset + position.character;
   }
-  /**
-   * **Create success result with formatter type**
-   */
-  private createFormatterResult(
-    text: string,
-    formatterType: string = "prettier"
-  ): FormatResult {
-    return {
-      success: true,
-      text,
-      formatterUsed: formatterType,
-    };
-  }
 
   /**
    * **Handle formatting errors with detailed diagnostics**
@@ -254,19 +372,15 @@ export class JavaScriptFormatter extends BaseFormatter {
     error: unknown,
     options: FormatOptions
   ): FormatResult {
-    // 创建基础错误信息
     const baseMessage =
       error instanceof Error ? error.message : "Unknown formatting error";
     const errorType = error instanceof Error ? error.constructor.name : "Error";
 
-    // 构建增强错误信息
     let enhancedMessage = `${errorType}: ${baseMessage}`;
 
-    // 添加特定语言的错误提示
     const languageInfo = `Language: ${options.languageId}`;
     enhancedMessage += `\n${languageInfo}`;
 
-    // 如果是 Prettier 的语法错误，尝试提取行号和列号信息
     if (
       baseMessage.includes("Unexpected token") ||
       baseMessage.includes("SyntaxError")
@@ -279,24 +393,30 @@ export class JavaScriptFormatter extends BaseFormatter {
       }
     }
 
-    // 添加常见错误的解决建议
     if (baseMessage.includes("Unknown option")) {
       enhancedMessage += `\nThis may be due to incompatible Prettier options or version mismatch.`;
     } else if (baseMessage.includes("No parser could be inferred")) {
       enhancedMessage += `\nCould not determine appropriate parser for ${options.languageId}.`;
     }
 
-    // 创建增强错误对象
-    const formattingError = new FormatError(
-      enhancedMessage,
-      options.languageId,
-      error instanceof Error ? error : undefined
-    );
-
     return {
       success: false,
-      text: undefined,
-      error: formattingError,
+      edits: [],
+      errors: [{
+        code: "FORMATTING_ERROR",
+        message: enhancedMessage,
+        line: 0,
+        column: 0,
+        severity: DiagnosticLevel.ERROR,
+        source: this.name
+      }],
+      warnings: [],
+      suggestions: [],
+      formatterUsed: this.name,
+      executionTime: 0,
+      linesProcessed: 0,
+      charactersProcessed: 0,
+      fromCache: false
     };
   }
 }

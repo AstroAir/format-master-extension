@@ -30,9 +30,14 @@ export class DocumentFormatProvider
         insertSpaces: options.insertSpaces,
         indentSize: options.insertSpaces ? options.tabSize : 1,
         useTabs: !options.insertSpaces,
+        fileName: document.fileName,
       };
 
-      return await this.formatService.formatDocument(document, formatOptions);
+      const result = await this.formatService.formatDocument(
+        document,
+        formatOptions
+      );
+      return result.edits;
     } catch (error) {
       // **Let the format service handle the error logging**
       throw error;
@@ -59,13 +64,15 @@ export class DocumentFormatProvider
         insertSpaces: options.insertSpaces,
         indentSize: options.insertSpaces ? options.tabSize : 1,
         useTabs: !options.insertSpaces,
+        fileName: document.fileName,
       };
 
-      return await this.formatService.formatRange(
+      const result = await this.formatService.formatRange(
         document,
         range,
         formatOptions
       );
+      return result.edits;
     } catch (error) {
       // **Let the format service handle the error logging**
       throw error;

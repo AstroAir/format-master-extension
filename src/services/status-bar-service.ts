@@ -14,10 +14,10 @@ export class StatusBarService {
       vscode.StatusBarAlignment.Right,
       100
     );
-    
+
     this.statusBarItem.command = "formatMaster.showStatus";
     this.statusBarItem.tooltip = "Format Master Status - Click for details";
-    
+
     this.updateStatusBar();
   }
 
@@ -44,20 +44,20 @@ export class StatusBarService {
    */
   private showStatusBar(): void {
     const parts: string[] = [];
-    
+
     // **Base icon and name**
     parts.push("$(symbol-misc) Format Master");
-    
+
     // **Add operation count if available**
     if (this.metrics && this.metrics.totalFormatOperations > 0) {
       parts.push(`(${this.metrics.totalFormatOperations})`);
     }
-    
+
     // **Add active profile if available**
-    if (this.config?.activeProfile && this.config.activeProfile !== 'default') {
+    if (this.config?.activeProfile && this.config.activeProfile !== "default") {
       parts.push(`[${this.config.activeProfile}]`);
     }
-    
+
     // **Add format on save indicator**
     if (this.config?.formatOnSave) {
       parts.push("$(check)");
@@ -65,7 +65,7 @@ export class StatusBarService {
 
     this.statusBarItem.text = parts.join(" ");
     this.statusBarItem.show();
-    
+
     this.loggingService.debug("Status bar updated");
   }
 
@@ -83,7 +83,7 @@ export class StatusBarService {
   showOperationStatus(operation: string, duration?: number): void {
     const originalText = this.statusBarItem.text;
     this.statusBarItem.text = `$(sync~spin) ${operation}...`;
-    
+
     if (duration) {
       setTimeout(() => {
         this.statusBarItem.text = originalText;
@@ -97,10 +97,10 @@ export class StatusBarService {
   showErrorStatus(error: string, duration = 3000): void {
     const originalText = this.statusBarItem.text;
     const originalTooltip = this.statusBarItem.tooltip;
-    
+
     this.statusBarItem.text = "$(error) Format Master - Error";
     this.statusBarItem.tooltip = `Error: ${error}`;
-    
+
     setTimeout(() => {
       this.statusBarItem.text = originalText;
       this.statusBarItem.tooltip = originalTooltip;
@@ -112,9 +112,9 @@ export class StatusBarService {
    */
   showSuccessStatus(message: string, duration = 2000): void {
     const originalText = this.statusBarItem.text;
-    
+
     this.statusBarItem.text = "$(check) Format Master - Success";
-    
+
     setTimeout(() => {
       this.statusBarItem.text = originalText;
     }, duration);
@@ -125,23 +125,29 @@ export class StatusBarService {
    */
   updateTooltip(): void {
     const tooltipParts: string[] = ["Format Master Extension"];
-    
+
     if (this.config) {
-      tooltipParts.push(`Profile: ${this.config.activeProfile || 'Default'}`);
+      tooltipParts.push(`Profile: ${this.config.activeProfile || "Default"}`);
       tooltipParts.push(`Languages: ${this.config.enabledLanguages.length}`);
-      tooltipParts.push(`Format on Save: ${this.config.formatOnSave ? 'Enabled' : 'Disabled'}`);
+      tooltipParts.push(
+        `Format on Save: ${this.config.formatOnSave ? "Enabled" : "Disabled"}`
+      );
     }
-    
+
     if (this.metrics) {
       tooltipParts.push(`Operations: ${this.metrics.totalFormatOperations}`);
       if (this.metrics.totalFormatOperations > 0) {
-        tooltipParts.push(`Success Rate: ${this.metrics.successRate.toFixed(1)}%`);
-        tooltipParts.push(`Avg Time: ${this.metrics.averageFormatTime.toFixed(1)}ms`);
+        tooltipParts.push(
+          `Success Rate: ${this.metrics.successRate.toFixed(1)}%`
+        );
+        tooltipParts.push(
+          `Avg Time: ${this.metrics.averageFormatTime.toFixed(1)}ms`
+        );
       }
     }
-    
+
     tooltipParts.push("Click for more details");
-    
+
     this.statusBarItem.tooltip = tooltipParts.join("\n");
   }
 

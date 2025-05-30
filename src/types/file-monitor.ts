@@ -1,8 +1,8 @@
 export interface FileEvent {
-  type: 'create' | 'modify' | 'delete' | 'rename';
+  type: "create" | "modify" | "delete" | "rename";
   path: string;
   previousPath?: string; // For rename events
-  stats?: import('fs').Stats;
+  stats?: import("fs").Stats;
   timestamp: Date;
 }
 
@@ -23,6 +23,6 @@ export interface WatchDescriptor {
   path: string;
   options: Required<WatchOptions>;
   handlers: Set<EventHandler>;
-  watcher?: import('fs').FSWatcher;
+  watcher?: import("fs").FSWatcher;
   isActive: boolean;
 }

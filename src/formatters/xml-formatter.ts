@@ -1,13 +1,93 @@
 import * as xmlFormatter from "xml-formatter";
 import { BaseFormatter } from "./base-formatter";
-import { FormatOptions, FormatResult } from "../types";
+import {
+  FormatOptions,
+  FormatResult,
+  FormatterPriority,
+  FormatOptionDescriptor,
+  ValidationResult,
+  ValidationError,
+  DiagnosticLevel,
+} from "../types";
 import formatXml from "xml-formatter";
 
 /**
  * **Formatter for XML files**
  */
 export class XmlFormatter extends BaseFormatter {
+  public readonly name = "XML";
+  public readonly priority = FormatterPriority.NORMAL;
   public readonly supportedLanguages = ["xml", "xsl", "xsd", "svg"];
+
+  public async format(
+    text: string,
+    options: FormatOptions
+  ): Promise<FormatResult> {
+    return this.formatText(text, options);
+  }
+
+  public getSupportedOptions(): FormatOptionDescriptor[] {
+    return [
+      {
+        name: "collapseContent",
+        type: "boolean",
+        default: true,
+        required: false,
+        description: "Collapse content between tags where possible",
+      },
+      {
+        name: "preserveComments",
+        type: "boolean",
+        default: true,
+        required: false,
+        description: "Preserve XML comments in the output",
+      },
+      {
+        name: "whiteSpaceAtEndOfSelfClosingTag",
+        type: "boolean",
+        default: false,
+        required: false,
+        description: "Add whitespace before self-closing tag end",
+      },
+    ];
+  }
+
+  public getVersion(): string {
+    return "1.0.0";
+  }
+
+  public async validateSyntax(
+    content: string,
+    languageId: string
+  ): Promise<ValidationResult> {
+    try {
+      // Attempt to parse XML to validate syntax
+      formatXml(content, { throwOnFailure: true });
+      return {
+        isValid: true,
+        errors: [],
+        warnings: [],
+        suggestions: [],
+        executionTime: 0,
+      };
+    } catch (error) {
+      const validationError: ValidationError = {
+        code: "XML_SYNTAX_ERROR",
+        message: error instanceof Error ? error.message : "Invalid XML syntax",
+        line: 0,
+        column: 0,
+        severity: DiagnosticLevel.ERROR,
+        source: this.name,
+      };
+      return {
+        isValid: false,
+        errors: [validationError],
+        warnings: [],
+        suggestions: [],
+        executionTime: 0,
+      };
+    }
+  }
 
   /**
    * **Format XML content**
@@ -54,12 +134,11 @@ export class XmlFormatter extends BaseFormatter {
    * **Get the indentation string based on options**
    */
   private getIndentString(options: FormatOptions): string {
-    if (options.useTabs) {
+    if (!options.insertSpaces) {
       return "\t";
     }
 
-    const indentSize = options.tabSize || options.indentSize || 2;
-    return " ".repeat(indentSize);
+    return " ".repeat(options.tabSize);
   }
 
   /**

@@ -1,12 +1,139 @@
+import * as vscode from "vscode";
 import { BaseFormatter } from "./base-formatter";
-import { FormatOptions, FormatResult } from "../types";
+import {
+  FormatOptions,
+  FormatResult,
+  FormatterPriority,
+  ValidationResult,
+  FormatOptionDescriptor,
+  ValidationError,
+  DiagnosticLevel
+} from "../types";
 import { FormatError } from "../errors/format-error";
 
 /**
  * **Enhanced formatter for Markdown files with table formatting and link validation**
  */
 export class MarkdownFormatter extends BaseFormatter {
+  public readonly name = "markdown";
+  public readonly priority = 1;
   public readonly supportedLanguages = ["markdown", "md"];
+
+  public getSupportedOptions(): FormatOptionDescriptor[] {
+    return [
+      {
+        name: "removeTrailingHashes",
+        description: "Remove trailing hash symbols from headers",
+        type: "boolean",
+        required: false,
+        default: true
+      },
+      {
+        name: "listIndentSize",
+        description: "Number of spaces for list indentation",
+        type: "number",
+        required: false,
+        default: 2
+      },
+      {
+        name: "wrapText",
+        description: "Enable text wrapping at maxLineLength",
+        type: "boolean",
+        required: false,
+        default: true
+      }
+    ];
+  }
+
+  public getVersion(): string {
+    return "1.0.0";
+  }
+
+  public async format(text: string, options: FormatOptions): Promise<FormatResult> {
+    return this.formatText(text, options);
+  }
+
+  public async validateSyntax(content: string, languageId: string): Promise<ValidationResult> {
+    if (!this.canFormat(languageId)) {
+      return {
+        isValid: false,
+        errors: [{
+          code: "UNSUPPORTED_LANGUAGE",
+          message: `Unsupported language: ${languageId}`,
+          line: 0,
+          column: 0,
+          severity: DiagnosticLevel.ERROR,
+          source: this.name
+        }],
+        warnings: [],
+        suggestions: [],
+        executionTime: 0
+      };
+    }
+
+    // Basic Markdown syntax validation
+    try {
+      const startTime = Date.now();
+      const lines = content.split("\n");
+      const errors: ValidationError[] = [];
+      
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        
+        // Check for unmatched backticks
+        const backtickCount = (line.match(/`/g) || []).length;
+        if (backtickCount % 2 !== 0) {
+          errors.push({
+            code: "UNMATCHED_BACKTICK",
+            message: "Unmatched backtick",
+            line: i + 1,
+            column: line.indexOf("`") + 1,
+            severity: DiagnosticLevel.ERROR,
+            source: this.name
+          });
+        }
+
+        // Check for malformed links
+        const linkPattern = /\[([^\]]*)\]\(([^)]*)\)/g;
+        const links = Array.from(line.matchAll(linkPattern));
+        for (const link of links) {
+          if (!link[1].trim() || !link[2].trim()) {
+            errors.push({
+              code: "INVALID_LINK_FORMAT",
+              message: "Invalid link format - missing text or URL",
+              line: i + 1,
+              column: link.index! + 1,
+              severity: DiagnosticLevel.ERROR,
+              source: this.name
+            });
+          }
+        }
+      }
+
+      return {
+        isValid: errors.length === 0,
+        errors,
+        warnings: [],
+        suggestions: [],
+        executionTime: Date.now() - startTime
+      };
+    } catch (error) {
+      return {
+        isValid: false,
+        errors: [{
+          code: "VALIDATION_ERROR",
+          message: error instanceof Error ? error.message : "Unknown error",
+          line: 0,
+          column: 0,
+          severity: DiagnosticLevel.ERROR,
+          source: this.name
+        }],
+        warnings: [],
+        suggestions: [],
+        executionTime: 0
+      };
+    }
+  }
 
   /**
    * **Format Markdown content with enhanced features**
@@ -28,23 +155,36 @@ export class MarkdownFormatter extends BaseFormatter {
 
       return {
         success: true,
-        text: finalText,
-        changes: this.countChanges(text, finalText),
-        formatterUsed: "formatMaster-markdown",
+        edits: [vscode.TextEdit.replace(new vscode.Range(0, 0, Number.MAX_VALUE, Number.MAX_VALUE), finalText)],
+        errors: [],
+        warnings: [],
+        suggestions: [],
+        formatterUsed: this.name,
         executionTime,
-        originalLength: text.length,
-        newLength: finalText.length,
-        linesChanged: this.countLinesChanged(text, finalText),
+        linesProcessed: text.split('\n').length,
+        charactersProcessed: text.length,
+        fromCache: false
       };
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
       return {
         success: false,
-        error: new FormatError(
-          `Markdown formatting failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-          options.languageId,
-          error instanceof Error ? error : undefined
-        ),
-        formatterUsed: "formatMaster-markdown",
+        edits: [],
+        errors: [{
+          code: 'FORMAT_ERROR',
+          message: `Markdown formatting failed: ${errorMessage}`,
+          line: 0,
+          column: 0,
+          severity: DiagnosticLevel.ERROR,
+          source: this.name
+        }],
+        warnings: [],
+        suggestions: [],
+        formatterUsed: this.name,
+        executionTime: 0,
+        linesProcessed: 0,
+        charactersProcessed: 0,
+        fromCache: false
       };
     }
   }

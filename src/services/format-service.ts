@@ -1,16 +1,20 @@
-import * as vscode from 'vscode';
-import { 
-  IFormatService, 
-  IFormatter, 
-  ILoggingService, 
+import * as vscode from "vscode";
+import {
+  IFormatService,
+  IFormatter,
+  ILoggingService,
   ExtendedFormatOptions,
-  FormattingError,
+  FormatError,
   UnsupportedLanguageError,
   FormatOptions,
   FormatterIntegrationOptions,
-  FormatterPriority
-} from '../types';
-import { FormatterIntegrationService } from './formatter-integration-service';
+  FormatterPriority,
+  FormatResult,
+  BatchFormattingResult,
+  PreviewResult,
+  TextDiff,
+} from "../types";
+import { FormatterIntegrationService } from "./formatter-integration-service";
 
 /**
  * **Enhanced format service with built-in formatter integration**
@@ -29,25 +33,35 @@ export class FormatService implements IFormatService {
     try {
       for (const languageId of formatter.supportedLanguages) {
         this.formatters.set(languageId, formatter);
-        this.loggingService.debug(`Registered formatter for language: ${languageId}`);
+        this.loggingService.debug(
+          `Registered formatter for language: ${languageId}`
+        );
       }
-      
+
       // **For Universal Formatter, also register discovered languages**
-      if ('getDiscoveredLanguages' in formatter) {
+      if ("getDiscoveredLanguages" in formatter) {
         const universalFormatter = formatter as any;
-        universalFormatter.getDiscoveredLanguages().then((languages: string[]) => {
-          for (const languageId of languages) {
-            if (!this.formatters.has(languageId)) {
-              this.formatters.set(languageId, formatter);
-              this.loggingService.debug(`Auto-registered formatter for discovered language: ${languageId}`);
+        universalFormatter
+          .getDiscoveredLanguages()
+          .then((languages: string[]) => {
+            for (const languageId of languages) {
+              if (!this.formatters.has(languageId)) {
+                this.formatters.set(languageId, formatter);
+                this.loggingService.debug(
+                  `Auto-registered formatter for discovered language: ${languageId}`
+                );
+              }
             }
-          }
-        }).catch((error: any) => {
-          this.loggingService.warn('Failed to get discovered languages from Universal Formatter', error);
-        });
+          })
+          .catch((error: any) => {
+            this.loggingService.warn(
+              "Failed to get discovered languages from Universal Formatter",
+              error
+            );
+          });
       }
     } catch (error) {
-      this.loggingService.error('Failed to register formatter', error);
+      this.loggingService.error("Failed to register formatter", error);
       throw error;
     }
   }
@@ -70,18 +84,24 @@ export class FormatService implements IFormatService {
 
     // 寻找能够处理该语言的Universal Formatter
     for (const [, formatter] of this.formatters) {
-      if ('isLanguageSupported' in formatter) {
+      if ("isLanguageSupported" in formatter) {
         const universalFormatter = formatter as any;
         try {
-          const isSupported = await universalFormatter.isLanguageSupported(languageId);
+          const isSupported =
+            await universalFormatter.isLanguageSupported(languageId);
           if (isSupported) {
             // 自动注册该语言
             this.formatters.set(languageId, formatter);
-            this.loggingService.debug(`Auto-registered language support: ${languageId}`);
+            this.loggingService.debug(
+              `Auto-registered language support: ${languageId}`
+            );
             return true;
           }
         } catch (error) {
-          this.loggingService.warn(`Failed to check language support for ${languageId}`, error);
+          this.loggingService.warn(
+            `Failed to check language support for ${languageId}`,
+            error
+          );
         }
       }
     }
@@ -94,7 +114,7 @@ export class FormatService implements IFormatService {
    */
   getSupportedLanguages(): string[] {
     const languages = new Set<string>();
-    
+
     // 添加已注册的自定义格式化程序语言
     for (const languageId of this.formatters.keys()) {
       languages.add(languageId);
@@ -102,13 +122,17 @@ export class FormatService implements IFormatService {
 
     // 添加内置格式化程序支持的语言（同步获取）
     try {
-      const builtInLanguages = Array.from(this.integrationService['builtInFormatters'].keys())
-        .filter(lang => this.integrationService.hasBuiltInFormatter(lang));
+      const builtInLanguages = Array.from(
+        this.integrationService["builtInFormatters"].keys()
+      ).filter((lang) => this.integrationService.hasBuiltInFormatter(lang));
       for (const languageId of builtInLanguages) {
         languages.add(languageId);
       }
     } catch (error) {
-      this.loggingService.warn('Failed to get built-in formatter languages', error);
+      this.loggingService.warn(
+        "Failed to get built-in formatter languages",
+        error
+      );
     }
 
     return Array.from(languages).sort();
@@ -119,7 +143,7 @@ export class FormatService implements IFormatService {
    */
   async getExtendedSupportedLanguages(): Promise<string[]> {
     const languages = new Set<string>();
-    
+
     // 添加当前已知的语言
     const knownLanguages = this.getSupportedLanguages();
     for (const languageId of knownLanguages) {
@@ -128,15 +152,16 @@ export class FormatService implements IFormatService {
 
     // 添加Universal Formatter发现的语言
     for (const [, formatter] of this.formatters) {
-      if ('getDiscoveredLanguages' in formatter) {
+      if ("getDiscoveredLanguages" in formatter) {
         const universalFormatter = formatter as any;
         try {
-          const discoveredLanguages = await universalFormatter.getDiscoveredLanguages();
+          const discoveredLanguages =
+            await universalFormatter.getDiscoveredLanguages();
           for (const languageId of discoveredLanguages) {
             languages.add(languageId);
           }
         } catch (error) {
-          this.loggingService.warn('Failed to get discovered languages', error);
+          this.loggingService.warn("Failed to get discovered languages", error);
         }
       }
     }
@@ -149,13 +174,15 @@ export class FormatService implements IFormatService {
    */
   async refreshLanguageSupport(): Promise<void> {
     for (const [, formatter] of this.formatters) {
-      if ('refreshLanguageSupport' in formatter) {
+      if ("refreshLanguageSupport" in formatter) {
         const universalFormatter = formatter as any;
         try {
           await universalFormatter.refreshLanguageSupport();
-          this.loggingService.debug('Refreshed language support for Universal Formatter');
+          this.loggingService.debug(
+            "Refreshed language support for Universal Formatter"
+          );
         } catch (error) {
-          this.loggingService.warn('Failed to refresh language support', error);
+          this.loggingService.warn("Failed to refresh language support", error);
         }
       }
     }
@@ -164,22 +191,134 @@ export class FormatService implements IFormatService {
   /**
    * **Enhanced format document with integration support**
    */
+  async previewFormat(
+    document: vscode.TextDocument,
+    options?: FormatOptions
+  ): Promise<PreviewResult> {
+    try {
+      const formatter = this.getFormatter(document.languageId);
+      if (!formatter) {
+        throw new UnsupportedLanguageError(document.languageId);
+      }
+
+      const originalText = document.getText();
+      const formatOptions: FormatOptions = options || {
+        insertSpaces: true,
+        tabSize: 2,
+        languageId: document.languageId,
+        fileName: document.fileName
+      };
+      const formatResult = await formatter.formatText(originalText, formatOptions);
+
+      if (!formatResult.success || !formatResult.text) {
+        throw new FormatError(
+          formatResult.error?.message || "Formatting failed",
+          document.languageId,
+          formatResult.error
+        );
+      }
+
+      const diff = this.generateDiff(originalText, formatResult.text);
+      const changes = this.countChanges(diff);
+
+      return {
+        success: true,
+        text: formatResult.text,
+        diff,
+        previewText: formatResult.text,
+        canApply: changes > 0,
+        changes,
+        originalLength: originalText.length,
+        newLength: formatResult.text.length,
+        formatterUsed: formatResult.formatterUsed || "unknown"
+      };
+    } catch (error) {
+      return {
+        success: false,
+        text: "",
+        diff: [],
+        previewText: "",
+        canApply: false,
+        changes: 0,
+        error: error instanceof Error ? error.message : "Unknown error"
+      };
+    }
+  }
+
+
+  /**
+   * **Format multiple files**
+   */
+  async formatFiles(files: vscode.Uri[]): Promise<BatchFormattingResult[]> {
+    const results: BatchFormattingResult[] = [];
+
+    for (const file of files) {
+      try {
+        const document = await vscode.workspace.openTextDocument(file);
+        const startTime = Date.now();
+
+        const formatResult = await this.formatDocument(document);
+
+        results.push({
+          filePath: file.fsPath,
+          success: formatResult.success,
+          error: formatResult.error,
+          executionTime: Date.now() - startTime,
+          changes: formatResult.edits.length,
+        });
+      } catch (error) {
+        results.push({
+          filePath: file.fsPath,
+          success: false,
+          error: error instanceof Error ? error : new Error("Unknown error"),
+          executionTime: 0,
+          changes: 0,
+        });
+      }
+    }
+
+    return results;
+  }
+/**
+   * **Format entire document**
+   */
   async formatDocument(
-    document: vscode.TextDocument, 
-    options?: FormatOptions | ExtendedFormatOptions
-  ): Promise<vscode.TextEdit[]> {
-    return this.executeFormattingWithIntegration(document, options);
+    document: vscode.TextDocument,
+    options?: FormatOptions
+  ): Promise<FormatResult> {
+    const text = document.getText();
+    const fullRange = new vscode.Range(
+      document.positionAt(0),
+      document.positionAt(text.length)
+    );
+    return this.formatRange(document, fullRange, options);
   }
 
   /**
    * **Enhanced format range with integration support**
    */
   async formatRange(
-    document: vscode.TextDocument, 
-    range: vscode.Range, 
-    options?: FormatOptions | ExtendedFormatOptions
-  ): Promise<vscode.TextEdit[]> {
-    return this.executeFormattingWithIntegration(document, options, range);
+    document: vscode.TextDocument,
+    range: vscode.Range,
+    options?: FormatOptions
+  ): Promise<FormatResult> {
+    const edits = await this.executeFormattingWithIntegration(
+      document,
+      options,
+      range
+    );
+    return {
+      success: true,
+      edits,
+      errors: [],
+      warnings: [],
+      suggestions: [],
+      formatterUsed: "custom",
+      executionTime: 0,
+      linesProcessed: range.end.line - range.start.line + 1,
+      charactersProcessed: document.getText(range).length,
+      fromCache: false,
+    };
   }
 
   /**
@@ -192,49 +331,70 @@ export class FormatService implements IFormatService {
   ): Promise<vscode.TextEdit[]> {
     try {
       this.loggingService.debug(
-        `Formatting ${range ? 'range' : 'document'}: ${document.fileName} (${document.languageId})`
+        `Formatting ${range ? "range" : "document"}: ${document.fileName} (${document.languageId})`
       );
 
       const extendedOptions = this.ensureExtendedOptions(options, document);
       const integration = extendedOptions.integration!;
 
       // **Determine formatting strategy**
-      const strategy = await this.determineFormattingStrategy(document.languageId, integration);
+      const strategy = await this.determineFormattingStrategy(
+        document.languageId,
+        integration
+      );
       this.loggingService.debug(`Using formatting strategy: ${strategy}`);
 
       switch (strategy) {
-        case 'builtin-only':
-          return await this.executeBuiltInOnly(document, range, extendedOptions);
-          
-        case 'custom-only':
-          return await this.executeCustomOnly(document, range, extendedOptions);
-          
-        case 'custom-with-builtin-fallback':
-          return await this.executeCustomWithFallback(document, range, extendedOptions);
-          
-        case 'builtin-then-custom':
-          return await this.executeBuiltInThenCustom(document, range, extendedOptions);
-          
-        case 'custom-then-builtin':
-          return await this.executeCustomThenBuiltIn(document, range, extendedOptions);
-          
-        default:
-          throw new FormattingError(`Unknown formatting strategy: ${strategy}`, document.languageId);
-      }
+        case "builtin-only":
+          return await this.executeBuiltInOnly(
+            document,
+            range,
+            extendedOptions
+          );
 
+        case "custom-only":
+          return await this.executeCustomOnly(document, range, extendedOptions);
+
+        case "custom-with-builtin-fallback":
+          return await this.executeCustomWithFallback(
+            document,
+            range,
+            extendedOptions
+          );
+
+        case "builtin-then-custom":
+          return await this.executeBuiltInThenCustom(
+            document,
+            range,
+            extendedOptions
+          );
+
+        case "custom-then-builtin":
+          return await this.executeCustomThenBuiltIn(
+            document,
+            range,
+            extendedOptions
+          );
+
+        default:
+          throw new FormatError(
+            `Unknown formatting strategy: ${strategy}`,
+            document.languageId
+          );
+      }
     } catch (error) {
-      if (error instanceof FormattingError) {
-        this.loggingService.error('Formatting error', error);
+      if (error instanceof FormatError) {
+        this.loggingService.error("Formatting error", error);
         throw error;
       }
-      
-      const formattingError = new FormattingError(
-        `Unexpected error during formatting: ${error instanceof Error ? error.message : 'Unknown error'}`,
+
+      const formattingError = new FormatError(
+        `Unexpected error during formatting: ${error instanceof Error ? error.message : "Unknown error"}`,
         document.languageId,
         error instanceof Error ? error : undefined
       );
-      
-      this.loggingService.error('Unexpected formatting error', formattingError);
+
+      this.loggingService.error("Unexpected formatting error", formattingError);
       throw formattingError;
     }
   }
@@ -243,42 +403,59 @@ export class FormatService implements IFormatService {
    * **Determine the best formatting strategy**
    */
   private async determineFormattingStrategy(
-    languageId: string, 
-    integration: NonNullable<ExtendedFormatOptions['integration']> // integration is now non-nullable here
+    languageId: string,
+    integration: NonNullable<ExtendedFormatOptions["integration"]> // integration is now non-nullable here
   ): Promise<string> {
     const hasCustomFormatter = this.formatters.has(languageId);
-    const hasBuiltInFormatter = this.integrationService.hasBuiltInFormatter(languageId);
+    const hasBuiltInFormatter =
+      this.integrationService.hasBuiltInFormatter(languageId);
 
     // **Handle explicit preferences**
-    if (integration?.preferredFormatter === 'builtin' && hasBuiltInFormatter) {
-      return hasCustomFormatter && integration.fallbackToBuiltIn ? 'builtin-with-custom-fallback' : 'builtin-only';
+    if (integration?.preferredFormatter === "builtin" && hasBuiltInFormatter) {
+      return hasCustomFormatter && integration.fallbackToBuiltIn
+        ? "builtin-with-custom-fallback"
+        : "builtin-only";
     }
 
-    if (integration?.preferredFormatter === 'formatMaster' && hasCustomFormatter) {
-      return hasBuiltInFormatter && integration.fallbackToBuiltIn ? 'custom-with-builtin-fallback' : 'custom-only';
+    if (
+      integration?.preferredFormatter === "formatMaster" &&
+      hasCustomFormatter
+    ) {
+      return hasBuiltInFormatter && integration.fallbackToBuiltIn
+        ? "custom-with-builtin-fallback"
+        : "custom-only";
     }
 
     // **Handle chaining**
-    if (integration?.chainFormatters && hasBuiltInFormatter && hasCustomFormatter) {
-      return 'builtin-then-custom';
+    if (
+      integration?.chainFormatters &&
+      hasBuiltInFormatter &&
+      hasCustomFormatter
+    ) {
+      return "builtin-then-custom";
     }
 
     // **Auto mode - choose best available**
-    if (integration?.preferredFormatter === 'auto' || !integration?.preferredFormatter) {
+    if (
+      integration?.preferredFormatter === "auto" ||
+      !integration?.preferredFormatter
+    ) {
       if (hasCustomFormatter && hasBuiltInFormatter) {
-        return integration?.fallbackToBuiltIn ? 'custom-with-builtin-fallback' : 'custom-only';
+        return integration?.fallbackToBuiltIn
+          ? "custom-with-builtin-fallback"
+          : "custom-only";
       } else if (hasCustomFormatter) {
-        return 'custom-only';
+        return "custom-only";
       } else if (hasBuiltInFormatter) {
-        return 'builtin-only';
+        return "builtin-only";
       }
     }
 
     // **Fallback**
     if (hasCustomFormatter) {
-      return 'custom-only';
+      return "custom-only";
     } else if (hasBuiltInFormatter && integration?.useBuiltInFormatter) {
-      return 'builtin-only';
+      return "builtin-only";
     }
 
     throw new UnsupportedLanguageError(languageId);
@@ -292,10 +469,14 @@ export class FormatService implements IFormatService {
     range: vscode.Range | undefined,
     options: ExtendedFormatOptions
   ): Promise<vscode.TextEdit[]> {
-    this.loggingService.debug('Executing built-in formatter only');
-    
+    this.loggingService.debug("Executing built-in formatter only");
+
     const formatOptions = this.createVSCodeFormatOptions(options);
-    return await this.integrationService.executeBuiltInFormatter(document, range, formatOptions);
+    return await this.integrationService.executeBuiltInFormatter(
+      document,
+      range,
+      formatOptions
+    );
   }
 
   /**
@@ -306,8 +487,8 @@ export class FormatService implements IFormatService {
     range: vscode.Range | undefined,
     options: ExtendedFormatOptions
   ): Promise<vscode.TextEdit[]> {
-    this.loggingService.debug('Executing custom formatter only');
-    
+    this.loggingService.debug("Executing custom formatter only");
+
     const formatter = this.getFormatter(document.languageId);
     if (!formatter) {
       throw new UnsupportedLanguageError(document.languageId);
@@ -317,19 +498,21 @@ export class FormatService implements IFormatService {
     const result = await formatter.formatText(text, options);
 
     if (!result.success || !result.text) {
-      throw new FormattingError(
-        result.error?.message || 'Custom formatting failed',
+      throw new FormatError(
+        result.error?.message || "Custom formatting failed",
         document.languageId,
         result.error
       );
     }
 
     if (result.text !== text) {
-      const editRange = range || new vscode.Range(
-        document.positionAt(0),
-        document.positionAt(text.length)
-      );
-      
+      const editRange =
+        range ||
+        new vscode.Range(
+          document.positionAt(0),
+          document.positionAt(text.length)
+        );
+
       return [vscode.TextEdit.replace(editRange, result.text)];
     }
 
@@ -344,17 +527,22 @@ export class FormatService implements IFormatService {
     range: vscode.Range | undefined,
     options: ExtendedFormatOptions
   ): Promise<vscode.TextEdit[]> {
-    this.loggingService.debug('Executing custom formatter with built-in fallback');
-    
+    this.loggingService.debug(
+      "Executing custom formatter with built-in fallback"
+    );
+
     try {
       return await this.executeCustomOnly(document, range, options);
     } catch (error) {
-      this.loggingService.warn('Custom formatter failed, falling back to built-in', error);
-      
+      this.loggingService.warn(
+        "Custom formatter failed, falling back to built-in",
+        error
+      );
+
       if (this.integrationService.hasBuiltInFormatter(document.languageId)) {
         return await this.executeBuiltInOnly(document, range, options);
       }
-      
+
       throw error;
     }
   }
@@ -367,18 +555,25 @@ export class FormatService implements IFormatService {
     range: vscode.Range | undefined,
     options: ExtendedFormatOptions
   ): Promise<vscode.TextEdit[]> {
-    this.loggingService.debug('Executing chained formatting: built-in then custom');
-    
+    this.loggingService.debug(
+      "Executing chained formatting: built-in then custom"
+    );
+
     const result = await this.integrationService.executeChainedFormatting(
       document,
-      async (doc, opts) => await this.executeCustomOnly(doc, range, this.ensureExtendedOptions(opts, doc)),
+      async (doc, opts) =>
+        await this.executeCustomOnly(
+          doc,
+          range,
+          this.ensureExtendedOptions(opts, doc)
+        ),
       options,
       range
     );
 
     if (!result.success) {
-      throw new FormattingError(
-        result.error?.message || 'Chained formatting failed',
+      throw new FormatError(
+        result.error?.message || "Chained formatting failed",
         document.languageId,
         result.error
       );
@@ -397,25 +592,29 @@ export class FormatService implements IFormatService {
     range: vscode.Range | undefined,
     options: ExtendedFormatOptions
   ): Promise<vscode.TextEdit[]> {
-    this.loggingService.debug('Executing custom formatter then built-in');
-    
+    this.loggingService.debug("Executing custom formatter then built-in");
+
     // **First apply custom formatting**
     let edits = await this.executeCustomOnly(document, range, options);
-    
+
     if (edits.length > 0) {
       // **Apply custom edits**
       const workspaceEdit = new vscode.WorkspaceEdit();
       workspaceEdit.set(document.uri, edits);
       await vscode.workspace.applyEdit(workspaceEdit);
-      
+
       // **Then apply built-in formatting to the result**
-      const builtInEdits = await this.executeBuiltInOnly(document, range, options);
+      const builtInEdits = await this.executeBuiltInOnly(
+        document,
+        range,
+        options
+      );
       edits.push(...builtInEdits);
     } else {
       // **If no custom changes, just use built-in**
       edits = await this.executeBuiltInOnly(document, range, options);
     }
-    
+
     return edits;
   }
 
@@ -431,25 +630,27 @@ export class FormatService implements IFormatService {
     // Start with base properties and apply overrides from options
     // The type assertion here helps TypeScript understand the shape before 'integration' is conditionally added.
     const combinedOptions = {
-        languageId: document.languageId, // Must be present
-        tabSize: editorConfigOptions.tabSize,
-        insertSpaces: editorConfigOptions.insertSpaces,
-        ...(options || {}), // Spread all fields from options. This will include 'integration' if options is ExtendedFormatOptions.
+      languageId: document.languageId, // Must be present
+      tabSize: editorConfigOptions.tabSize,
+      insertSpaces: editorConfigOptions.insertSpaces,
+      ...(options || {}), // Spread all fields from options. This will include 'integration' if options is ExtendedFormatOptions.
     } as Partial<ExtendedFormatOptions> & { languageId: string };
-
 
     // Ensure integration options are present
     // If ExtendedFormatOptions defines 'integration' as optional, this assignment is fine.
     // If 'integration' is non-optional, this ensures it's set.
     if (!combinedOptions.integration) {
-      const config = vscode.workspace.getConfiguration('formatMaster');
-      
+      const config = vscode.workspace.getConfiguration("formatMaster");
+
       combinedOptions.integration = {
-        useBuiltInFormatter: config.get<boolean>('useBuiltInFormatter', true),
-        fallbackToBuiltIn: config.get<boolean>('fallbackToBuiltIn', true),
-        preferredFormatter: config.get<'formatMaster' | 'builtin' | 'auto'>('preferredFormatter', 'auto'),
-        chainFormatters: config.get<boolean>('chainFormatters', false),
-        retryOnFailure: config.get<boolean>('retryOnFailure', true)
+        useBuiltInFormatter: config.get<boolean>("useBuiltInFormatter", true),
+        fallbackToBuiltIn: config.get<boolean>("fallbackToBuiltIn", true),
+        preferredFormatter: config.get<"formatMaster" | "builtin" | "auto">(
+          "preferredFormatter",
+          "auto"
+        ),
+        chainFormatters: config.get<boolean>("chainFormatters", false),
+        retryOnFailure: config.get<boolean>("retryOnFailure", true),
       };
     }
 
@@ -461,22 +662,29 @@ export class FormatService implements IFormatService {
   /**
    * **Create VSCode formatting options**
    */
-  private createVSCodeFormatOptions(options: ExtendedFormatOptions): vscode.FormattingOptions {
+  private createVSCodeFormatOptions(
+    options: ExtendedFormatOptions
+  ): vscode.FormattingOptions {
     return {
       tabSize: options?.tabSize || options?.indentSize || 2,
-      insertSpaces: options?.insertSpaces ?? !options?.useTabs
+      insertSpaces: options?.insertSpaces ?? !options?.useTabs,
     };
   }
 
   /**
    * **Get document-specific formatting options**
    */
-  private getDocumentOptions(document: vscode.TextDocument): Partial<FormatOptions> {
-    const editorConfig = vscode.workspace.getConfiguration('editor', document.uri);
-    
+  private getDocumentOptions(
+    document: vscode.TextDocument
+  ): Partial<FormatOptions> {
+    const editorConfig = vscode.workspace.getConfiguration(
+      "editor",
+      document.uri
+    );
+
     return {
-      tabSize: editorConfig.get<number>('tabSize', 2),
-      insertSpaces: editorConfig.get<boolean>('insertSpaces', true)
+      tabSize: editorConfig.get<number>("tabSize", 2),
+      insertSpaces: editorConfig.get<boolean>("insertSpaces", true),
     };
   }
 
@@ -484,7 +692,10 @@ export class FormatService implements IFormatService {
    * **Check if a language is supported (including built-in formatters)**
    */
   isLanguageSupported(languageId: string): boolean {
-    return this.formatters.has(languageId) || this.integrationService.hasBuiltInFormatter(languageId);
+    return (
+      this.formatters.has(languageId) ||
+      this.integrationService.hasBuiltInFormatter(languageId)
+    );
   }
 
   /**
@@ -492,10 +703,10 @@ export class FormatService implements IFormatService {
    */
   async getDiscoveredLanguages(): Promise<string[]> {
     const discoveredLanguages = new Set<string>();
-    
+
     // 从Universal Formatter获取已发现的语言
     for (const [, formatter] of this.formatters) {
-      if ('getDiscoveredLanguages' in formatter) {
+      if ("getDiscoveredLanguages" in formatter) {
         const universalFormatter = formatter as any;
         try {
           const languages = await universalFormatter.getDiscoveredLanguages();
@@ -503,10 +714,11 @@ export class FormatService implements IFormatService {
             discoveredLanguages.add(languageId);
           }
         } catch (error) {
-          this.loggingService.warn('Failed to get discovered languages', error);
+          this.loggingService.warn("Failed to get discovered languages", error);
         }
       }
-    }    return Array.from(discoveredLanguages).sort();
+    }
+    return Array.from(discoveredLanguages).sort();
   }
 
   /**
@@ -520,34 +732,42 @@ export class FormatService implements IFormatService {
    * **Smart format document - automatically determines best formatter**
    */
   async smartFormatDocument(
-    document: vscode.TextDocument, 
+    document: vscode.TextDocument,
     options?: FormatOptions
   ): Promise<vscode.TextEdit[]> {
     const languageId = document.languageId;
-    
+
     try {
       // **First, check dynamic language support**
       const isSupported = await this.checkLanguageSupport(languageId);
       if (!isSupported) {
         // **Try to refresh formatter detection for this language**
-        this.loggingService.debug(`Refreshing formatter detection for ${languageId}`);
+        this.loggingService.debug(
+          `Refreshing formatter detection for ${languageId}`
+        );
         await this.integrationService.detectBuiltInFormatter(languageId);
       }
 
       // **Create extended options with smart defaults**
-      const extendedOptions = this.createSmartFormattingOptions(options, document);
-      
-      // **Use existing format document logic with enhanced options**
-      return await this.formatDocument(document, extendedOptions);
+      const extendedOptions = this.createSmartFormattingOptions(
+        options,
+        document
+      );
 
+      // **Use existing format document logic with enhanced options**
+      const result = await this.formatDocument(document, extendedOptions);
+      return result.edits;
     } catch (error) {
       if (error instanceof UnsupportedLanguageError) {
         // **Try to find alternative formatters**
-        const alternativeEdits = await this.tryAlternativeFormatters(document, options);
+        const alternativeEdits = await this.tryAlternativeFormatters(
+          document,
+          options
+        );
         if (alternativeEdits.length > 0) {
           return alternativeEdits;
         }
-        
+
         // **Suggest installing relevant extensions**
         await this.suggestFormatterExtensions(languageId);
         throw error;
@@ -564,15 +784,21 @@ export class FormatService implements IFormatService {
     document: vscode.TextDocument
   ): ExtendedFormatOptions {
     const hasCustomFormatter = this.formatters.has(document.languageId);
-    const hasBuiltInFormatter = this.integrationService.hasBuiltInFormatter(document.languageId);
-    
+    const hasBuiltInFormatter = this.integrationService.hasBuiltInFormatter(
+      document.languageId
+    );
+
     // **Smart defaults based on available formatters**
     const smartIntegration: FormatterIntegrationOptions = {
       useBuiltInFormatter: true,
       fallbackToBuiltIn: true,
-      preferredFormatter: hasCustomFormatter ? 'formatMaster' : hasBuiltInFormatter ? 'builtin' : 'auto',
+      preferredFormatter: hasCustomFormatter
+        ? "formatMaster"
+        : hasBuiltInFormatter
+          ? "builtin"
+          : "auto",
       chainFormatters: hasCustomFormatter && hasBuiltInFormatter,
-      retryOnFailure: true
+      retryOnFailure: true,
     };
 
     return {
@@ -580,7 +806,6 @@ export class FormatService implements IFormatService {
       integration: smartIntegration,
       priority: FormatterPriority.NORMAL,
       timeout: 30000, // 30 seconds timeout
-      retryCount: 1
     };
   }
 
@@ -592,23 +817,29 @@ export class FormatService implements IFormatService {
     options?: FormatOptions
   ): Promise<vscode.TextEdit[]> {
     const languageId = document.languageId;
-    
+
     // **Check for similar language formatters**
     const similarLanguages = this.getSimilarLanguages(languageId);
-    
+
     for (const similarLang of similarLanguages) {
       if (this.formatters.has(similarLang)) {
-        this.loggingService.debug(`Trying formatter for similar language: ${similarLang}`);
-        
+        this.loggingService.debug(
+          `Trying formatter for similar language: ${similarLang}`
+        );
+
         try {
           const formatter = this.formatters.get(similarLang)!;
           const text = document.getText();
-          const result = await formatter.formatText(text, options || {
-            languageId: similarLang,
-            tabSize: 2,
-            useTabs: false
-          });
-          
+          const result = await formatter.formatText(
+            text,
+            options || {
+              languageId: similarLang,
+              tabSize: 2,
+              insertSpaces: true,
+              fileName: document.fileName,
+            }
+          );
+
           if (result.success && result.text) {
             const fullRange = new vscode.Range(
               document.positionAt(0),
@@ -617,12 +848,15 @@ export class FormatService implements IFormatService {
             return [vscode.TextEdit.replace(fullRange, result.text)];
           }
         } catch (error) {
-          this.loggingService.debug(`Alternative formatter ${similarLang} failed:`, error);
+          this.loggingService.debug(
+            `Alternative formatter ${similarLang} failed:`,
+            error
+          );
           continue;
         }
       }
     }
-    
+
     return [];
   }
 
@@ -631,23 +865,23 @@ export class FormatService implements IFormatService {
    */
   private getSimilarLanguages(languageId: string): string[] {
     const languageFamilies: Record<string, string[]> = {
-      javascript: ['typescript', 'javascriptreact', 'typescriptreact'],
-      typescript: ['javascript', 'javascriptreact', 'typescriptreact'],
-      javascriptreact: ['javascript', 'typescript', 'typescriptreact'],
-      typescriptreact: ['typescript', 'javascript', 'javascriptreact'],
-      html: ['xml', 'xhtml'],
-      xml: ['html', 'xhtml'],
-      css: ['scss', 'less'],
-      scss: ['css', 'less'],
-      less: ['css', 'scss'],
-      yaml: ['yml'],
-      yml: ['yaml'],
-      c: ['cpp'],
-      cpp: ['c'],
-      json: ['jsonc'],
-      jsonc: ['json']
+      javascript: ["typescript", "javascriptreact", "typescriptreact"],
+      typescript: ["javascript", "javascriptreact", "typescriptreact"],
+      javascriptreact: ["javascript", "typescript", "typescriptreact"],
+      typescriptreact: ["typescript", "javascript", "javascriptreact"],
+      html: ["xml", "xhtml"],
+      xml: ["html", "xhtml"],
+      css: ["scss", "less"],
+      scss: ["css", "less"],
+      less: ["css", "scss"],
+      yaml: ["yml"],
+      yml: ["yaml"],
+      c: ["cpp"],
+      cpp: ["c"],
+      json: ["jsonc"],
+      jsonc: ["json"],
     };
-    
+
     return languageFamilies[languageId] || [];
   }
 
@@ -661,7 +895,10 @@ export class FormatService implements IFormatService {
       csharp: { name: "C#", id: "ms-dotnettools.csharp" },
       go: { name: "Go", id: "golang.go" },
       rust: { name: "Rust Analyzer", id: "rust-lang.rust-analyzer" },
-      php: { name: "PHP Intelephense", id: "bmewburn.vscode-intelephense-client" },
+      php: {
+        name: "PHP Intelephense",
+        id: "bmewburn.vscode-intelephense-client",
+      },
       ruby: { name: "Ruby", id: "rebornix.ruby" },
       swift: { name: "Swift", id: "swift-server.swift" },
       kotlin: { name: "Kotlin", id: "mathiasfrohlich.kotlin" },
@@ -671,23 +908,70 @@ export class FormatService implements IFormatService {
       powershell: { name: "PowerShell", id: "ms-vscode.powershell" },
       shellscript: { name: "ShellCheck", id: "timonwong.shellcheck" },
       dockerfile: { name: "Docker", id: "ms-azuretools.vscode-docker" },
-      sql: { name: "SQL Server (mssql)", id: "ms-mssql.mssql" }
+      sql: { name: "SQL Server (mssql)", id: "ms-mssql.mssql" },
     };
 
     const suggestion = extensionSuggestions[languageId];
     if (suggestion) {
       const action = await vscode.window.showInformationMessage(
         `No formatter found for ${languageId}. Would you like to install the ${suggestion.name} extension?`,
-        'Install', 'Not now'
+        "Install",
+        "Not now"
       );
-      
-      if (action === 'Install') {
-        vscode.commands.executeCommand('extension.open', suggestion.id);
+
+      if (action === "Install") {
+        vscode.commands.executeCommand("extension.open", suggestion.id);
       }
     } else {
       vscode.window.showInformationMessage(
         `No formatter available for ${languageId}. Consider installing a relevant extension from the marketplace.`
       );
     }
+  }
+
+  /**
+   * Generate a diff between original and formatted text
+   * @param originalText The original text content
+   * @param newText The formatted text content
+   * @returns TextDiff array showing the changes
+   */
+  private generateDiff(originalText: string, newText: string): TextDiff {
+    const diff: TextDiff = [];
+    const originalLines = originalText.split(/\r?\n/);
+    const newLines = newText.split(/\r?\n/);
+    
+    const maxLines = Math.max(originalLines.length, newLines.length);
+    
+    for (let i = 0; i < maxLines; i++) {
+      const originalLine = originalLines[i] || '';
+      const newLine = newLines[i] || '';
+      
+      if (originalLine === newLine) {
+        diff.push({
+          type: 'equal',
+          lineNumber: i + 1,
+          originalText: originalLine,
+          newText: newLine
+        });
+      } else {
+        diff.push({
+          type: 'modify',
+          lineNumber: i + 1,
+          originalText: originalLine,
+          newText: newLine
+        });
+      }
+    }
+    
+    return diff;
+  }
+
+  /**
+   * Count the number of changes in a diff
+   * @param diff The TextDiff array
+   * @returns Number of changes (non-equal items)
+   */
+  private countChanges(diff: TextDiff): number {
+    return diff.filter(item => item.type !== 'equal').length;
   }
 }
