@@ -62,7 +62,9 @@ export interface IPerformanceMonitoringService {
 /**
  * **Service for monitoring and tracking formatting performance metrics**
  */
-export class PerformanceMonitoringService implements IPerformanceMonitoringService {
+export class PerformanceMonitoringService
+  implements IPerformanceMonitoringService
+{
   private metrics: PerformanceMetrics = {
     totalFormatOperations: 0,
     averageFormatTime: 0,

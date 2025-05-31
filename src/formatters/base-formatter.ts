@@ -6,7 +6,7 @@ import {
   ValidationResult,
   ValidationError,
   DiagnosticLevel,
-  FormatOptionDescriptor
+  FormatOptionDescriptor,
 } from "../types";
 
 /**
@@ -117,9 +117,9 @@ export abstract class BaseFormatter implements IFormatter {
       suggestions: [],
       formatterUsed: this.name,
       executionTime: 0,
-      linesProcessed: text.split('\n').length,
+      linesProcessed: text.split("\n").length,
       charactersProcessed: text.length,
-      fromCache: false
+      fromCache: false,
     };
   }
 
@@ -130,21 +130,23 @@ export abstract class BaseFormatter implements IFormatter {
     return {
       success: false,
       edits: [],
-      errors: [{
-        code: 'FORMAT_ERROR',
-        message: error.message,
-        line: 0,
-        column: 0,
-        severity: DiagnosticLevel.ERROR,
-        source: this.name
-      }],
+      errors: [
+        {
+          code: "FORMAT_ERROR",
+          message: error.message,
+          line: 0,
+          column: 0,
+          severity: DiagnosticLevel.ERROR,
+          source: this.name,
+        },
+      ],
       warnings: [],
       suggestions: [],
       formatterUsed: this.name,
       executionTime: 0,
       linesProcessed: 0,
       charactersProcessed: 0,
-      fromCache: false
+      fromCache: false,
     };
   }
 

@@ -783,15 +783,14 @@ async function executePreviewFormatting(): Promise<void> {
 
   try {
     loggingService.info("Generating formatting preview...");
-    const previewResult = await (previewService as any).previewFormat(editor.document);
+    const previewResult = await (previewService as any).previewFormat(
+      editor.document
+    );
 
     // Check if preview has success property
     if ("success" in previewResult && previewResult.success) {
       await previewService.showPreview(previewResult);
-      if (
-        "canApply" in previewResult &&
-        previewResult.canApply
-      ) {
+      if ("canApply" in previewResult && previewResult.canApply) {
         await vscode.commands.executeCommand("formatMaster.formatDocument");
       }
     } else {

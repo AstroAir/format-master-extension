@@ -15,7 +15,7 @@ export interface EncodingInfo {
  * Represents a single change in a diff
  */
 export interface TextDiffItem {
-  type: 'add' | 'remove' | 'modify' | 'equal';
+  type: "add" | "remove" | "modify" | "equal";
   lineNumber?: number;
   originalText?: string;
   newText?: string;
@@ -134,7 +134,7 @@ export interface ILoggingService {
 /**
  * **Log format types**
  */
-export type LogFormat = 'text' | 'json' | 'html';
+export type LogFormat = "text" | "json" | "html";
 
 /**
  * **Log message interface**
@@ -521,7 +521,9 @@ export interface IGitService {
   uninstallPreCommitHook(): Promise<void>;
   isPreCommitHookInstalled(): Promise<boolean>;
   getGitIntegrationConfig(): Promise<GitIntegrationConfig>;
-  updateGitIntegrationConfig(config: Partial<GitIntegrationConfig>): Promise<void>;
+  updateGitIntegrationConfig(
+    config: Partial<GitIntegrationConfig>
+  ): Promise<void>;
   getDiff(files: string[], repository?: string): Promise<Map<string, string>>;
   stageFiles(files: string[], repository?: string): Promise<void>;
   hasUncommittedChanges(repository?: string): Promise<boolean>;
@@ -556,10 +558,17 @@ export interface LanguageMetrics {
 export interface IConfigurationService {
   onConfigurationChanged: vscode.Event<void>;
   getConfig(workspaceFolder?: string): FormatConfig;
-  getLanguageConfig(languageId: string, workspaceFolder?: string): Partial<FormatConfig> & LanguageConfig;
+  getLanguageConfig(
+    languageId: string,
+    workspaceFolder?: string
+  ): Partial<FormatConfig> & LanguageConfig;
   validateConfig(config?: Partial<FormatConfig>): ValidationResult;
   listProfiles(): ConfigurationProfile[];
-  createProfile(name: string, config: Partial<FormatConfig>, description?: string): Promise<void>;
+  createProfile(
+    name: string,
+    config: Partial<FormatConfig>,
+    description?: string
+  ): Promise<void>;
   switchProfile(profileName: string): Promise<void>;
   exportProfile(name: string): Promise<string>;
   importProfile(profileData: string): Promise<void>;

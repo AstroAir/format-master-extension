@@ -21,7 +21,7 @@ export class PythonFormatter extends BaseFormatter {
    * **Format Python code with PEP 8 compliance**
    */
   public async formatText(
-    text: string, 
+    text: string,
     options: FormatOptions
   ): Promise<FormatResult> {
     try {

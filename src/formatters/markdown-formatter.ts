@@ -7,7 +7,7 @@ import {
   ValidationResult,
   FormatOptionDescriptor,
   ValidationError,
-  DiagnosticLevel
+  DiagnosticLevel,
 } from "../types";
 import { FormatError } from "../errors/format-error";
 
@@ -26,22 +26,22 @@ export class MarkdownFormatter extends BaseFormatter {
         description: "Remove trailing hash symbols from headers",
         type: "boolean",
         required: false,
-        default: true
+        default: true,
       },
       {
         name: "listIndentSize",
         description: "Number of spaces for list indentation",
         type: "number",
         required: false,
-        default: 2
+        default: 2,
       },
       {
         name: "wrapText",
         description: "Enable text wrapping at maxLineLength",
         type: "boolean",
         required: false,
-        default: true
-      }
+        default: true,
+      },
     ];
   }
 
@@ -49,25 +49,33 @@ export class MarkdownFormatter extends BaseFormatter {
     return "1.0.0";
   }
 
-  public async format(text: string, options: FormatOptions): Promise<FormatResult> {
+  public async format(
+    text: string,
+    options: FormatOptions
+  ): Promise<FormatResult> {
     return this.formatText(text, options);
   }
 
-  public async validateSyntax(content: string, languageId: string): Promise<ValidationResult> {
+  public async validateSyntax(
+    content: string,
+    languageId: string
+  ): Promise<ValidationResult> {
     if (!this.canFormat(languageId)) {
       return {
         isValid: false,
-        errors: [{
-          code: "UNSUPPORTED_LANGUAGE",
-          message: `Unsupported language: ${languageId}`,
-          line: 0,
-          column: 0,
-          severity: DiagnosticLevel.ERROR,
-          source: this.name
-        }],
+        errors: [
+          {
+            code: "UNSUPPORTED_LANGUAGE",
+            message: `Unsupported language: ${languageId}`,
+            line: 0,
+            column: 0,
+            severity: DiagnosticLevel.ERROR,
+            source: this.name,
+          },
+        ],
         warnings: [],
         suggestions: [],
-        executionTime: 0
+        executionTime: 0,
       };
     }
 
@@ -76,10 +84,10 @@ export class MarkdownFormatter extends BaseFormatter {
       const startTime = Date.now();
       const lines = content.split("\n");
       const errors: ValidationError[] = [];
-      
+
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
-        
+
         // Check for unmatched backticks
         const backtickCount = (line.match(/`/g) || []).length;
         if (backtickCount % 2 !== 0) {
@@ -89,7 +97,7 @@ export class MarkdownFormatter extends BaseFormatter {
             line: i + 1,
             column: line.indexOf("`") + 1,
             severity: DiagnosticLevel.ERROR,
-            source: this.name
+            source: this.name,
           });
         }
 
@@ -104,7 +112,7 @@ export class MarkdownFormatter extends BaseFormatter {
               line: i + 1,
               column: link.index! + 1,
               severity: DiagnosticLevel.ERROR,
-              source: this.name
+              source: this.name,
             });
           }
         }
@@ -115,22 +123,24 @@ export class MarkdownFormatter extends BaseFormatter {
         errors,
         warnings: [],
         suggestions: [],
-        executionTime: Date.now() - startTime
+        executionTime: Date.now() - startTime,
       };
     } catch (error) {
       return {
         isValid: false,
-        errors: [{
-          code: "VALIDATION_ERROR",
-          message: error instanceof Error ? error.message : "Unknown error",
-          line: 0,
-          column: 0,
-          severity: DiagnosticLevel.ERROR,
-          source: this.name
-        }],
+        errors: [
+          {
+            code: "VALIDATION_ERROR",
+            message: error instanceof Error ? error.message : "Unknown error",
+            line: 0,
+            column: 0,
+            severity: DiagnosticLevel.ERROR,
+            source: this.name,
+          },
+        ],
         warnings: [],
         suggestions: [],
-        executionTime: 0
+        executionTime: 0,
       };
     }
   }
@@ -155,36 +165,44 @@ export class MarkdownFormatter extends BaseFormatter {
 
       return {
         success: true,
-        edits: [vscode.TextEdit.replace(new vscode.Range(0, 0, Number.MAX_VALUE, Number.MAX_VALUE), finalText)],
+        edits: [
+          vscode.TextEdit.replace(
+            new vscode.Range(0, 0, Number.MAX_VALUE, Number.MAX_VALUE),
+            finalText
+          ),
+        ],
         errors: [],
         warnings: [],
         suggestions: [],
         formatterUsed: this.name,
         executionTime,
-        linesProcessed: text.split('\n').length,
+        linesProcessed: text.split("\n").length,
         charactersProcessed: text.length,
-        fromCache: false
+        fromCache: false,
       };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       return {
         success: false,
         edits: [],
-        errors: [{
-          code: 'FORMAT_ERROR',
-          message: `Markdown formatting failed: ${errorMessage}`,
-          line: 0,
-          column: 0,
-          severity: DiagnosticLevel.ERROR,
-          source: this.name
-        }],
+        errors: [
+          {
+            code: "FORMAT_ERROR",
+            message: `Markdown formatting failed: ${errorMessage}`,
+            line: 0,
+            column: 0,
+            severity: DiagnosticLevel.ERROR,
+            source: this.name,
+          },
+        ],
         warnings: [],
         suggestions: [],
         formatterUsed: this.name,
         executionTime: 0,
         linesProcessed: 0,
         charactersProcessed: 0,
-        fromCache: false
+        fromCache: false,
       };
     }
   }

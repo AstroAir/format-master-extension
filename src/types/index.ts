@@ -9,5 +9,5 @@ export {
   ICodeAnalyzer,
   AnalysisResult,
   CodeMetrics,
-  AnalysisOptions
+  AnalysisOptions,
 } from "../services/code-analysis-service";

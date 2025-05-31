@@ -309,7 +309,8 @@ export class ValidationService {
     if (!config.incrementalFormatting) {
       suggestions.push({
         type: SuggestionType.PERFORMANCE,
-        message: "Enable incremental formatting for better performance on large files",
+        message:
+          "Enable incremental formatting for better performance on large files",
         range: new vscode.Range(0, 0, 0, 0),
         severity: DiagnosticLevel.INFO,
         confidence: 0.8,
@@ -320,7 +321,8 @@ export class ValidationService {
     if (!config.respectEditorConfig) {
       suggestions.push({
         type: SuggestionType.CONVENTION,
-        message: "Consider enabling EditorConfig support for better project consistency",
+        message:
+          "Consider enabling EditorConfig support for better project consistency",
         range: new vscode.Range(0, 0, 0, 0),
         severity: DiagnosticLevel.INFO,
         confidence: 0.8,
@@ -330,7 +332,8 @@ export class ValidationService {
     if (!config.respectPrettierConfig) {
       suggestions.push({
         type: SuggestionType.CONVENTION,
-        message: "Enable Prettier config respect for JavaScript/TypeScript projects",
+        message:
+          "Enable Prettier config respect for JavaScript/TypeScript projects",
         range: new vscode.Range(0, 0, 0, 0),
         severity: DiagnosticLevel.INFO,
         confidence: 0.8,
@@ -341,7 +344,8 @@ export class ValidationService {
     if (!config.enablePreview && config.enabledLanguages.length > 3) {
       suggestions.push({
         type: SuggestionType.STYLE,
-        message: "Enable preview mode to see formatting changes before applying",
+        message:
+          "Enable preview mode to see formatting changes before applying",
         range: new vscode.Range(0, 0, 0, 0),
         severity: DiagnosticLevel.INFO,
         confidence: 0.8,
@@ -351,7 +355,8 @@ export class ValidationService {
     if (!config.statusBarIntegration) {
       suggestions.push({
         type: SuggestionType.CONVENTION,
-        message: "Enable status bar integration for quick access to formatting status",
+        message:
+          "Enable status bar integration for quick access to formatting status",
         range: new vscode.Range(0, 0, 0, 0),
         severity: DiagnosticLevel.INFO,
         confidence: 0.8,

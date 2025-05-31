@@ -206,9 +206,12 @@ export class FormatService implements IFormatService {
         insertSpaces: true,
         tabSize: 2,
         languageId: document.languageId,
-        fileName: document.fileName
+        fileName: document.fileName,
       };
-      const formatResult = await formatter.formatText(originalText, formatOptions);
+      const formatResult = await formatter.formatText(
+        originalText,
+        formatOptions
+      );
 
       if (!formatResult.success || !formatResult.text) {
         throw new FormatError(
@@ -230,7 +233,7 @@ export class FormatService implements IFormatService {
         changes,
         originalLength: originalText.length,
         newLength: formatResult.text.length,
-        formatterUsed: formatResult.formatterUsed || "unknown"
+        formatterUsed: formatResult.formatterUsed || "unknown",
       };
     } catch (error) {
       return {
@@ -240,11 +243,10 @@ export class FormatService implements IFormatService {
         previewText: "",
         canApply: false,
         changes: 0,
-        error: error instanceof Error ? error.message : "Unknown error"
+        error: error instanceof Error ? error.message : "Unknown error",
       };
     }
   }
-
 
   /**
    * **Format multiple files**
@@ -279,7 +281,7 @@ export class FormatService implements IFormatService {
 
     return results;
   }
-/**
+  /**
    * **Format entire document**
    */
   async formatDocument(
@@ -939,30 +941,30 @@ export class FormatService implements IFormatService {
     const diff: TextDiff = [];
     const originalLines = originalText.split(/\r?\n/);
     const newLines = newText.split(/\r?\n/);
-    
+
     const maxLines = Math.max(originalLines.length, newLines.length);
-    
+
     for (let i = 0; i < maxLines; i++) {
-      const originalLine = originalLines[i] || '';
-      const newLine = newLines[i] || '';
-      
+      const originalLine = originalLines[i] || "";
+      const newLine = newLines[i] || "";
+
       if (originalLine === newLine) {
         diff.push({
-          type: 'equal',
+          type: "equal",
           lineNumber: i + 1,
           originalText: originalLine,
-          newText: newLine
+          newText: newLine,
         });
       } else {
         diff.push({
-          type: 'modify',
+          type: "modify",
           lineNumber: i + 1,
           originalText: originalLine,
-          newText: newLine
+          newText: newLine,
         });
       }
     }
-    
+
     return diff;
   }
 
@@ -972,6 +974,6 @@ export class FormatService implements IFormatService {
    * @returns Number of changes (non-equal items)
    */
   private countChanges(diff: TextDiff): number {
-    return diff.filter(item => item.type !== 'equal').length;
+    return diff.filter((item) => item.type !== "equal").length;
   }
 }

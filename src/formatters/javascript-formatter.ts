@@ -1,7 +1,14 @@
 import * as vscode from "vscode";
 import * as prettier from "prettier";
 import { BaseFormatter } from "./base-formatter";
-import { FormatOptions, FormatResult, FormatterPriority, FormatOptionDescriptor, ValidationResult, DiagnosticLevel } from "../types";
+import {
+  FormatOptions,
+  FormatResult,
+  FormatterPriority,
+  FormatOptionDescriptor,
+  ValidationResult,
+  DiagnosticLevel,
+} from "../types";
 import { FormatError } from "../errors/format-error";
 
 /**
@@ -17,7 +24,10 @@ export class JavaScriptFormatter extends BaseFormatter {
     "typescriptreact",
   ];
 
-  public async format(text: string, options: FormatOptions): Promise<FormatResult> {
+  public async format(
+    text: string,
+    options: FormatOptions
+  ): Promise<FormatResult> {
     return this.formatText(text, options);
   }
 
@@ -57,7 +67,7 @@ export class JavaScriptFormatter extends BaseFormatter {
         default: false,
         required: false,
         description: "Use single quotes instead of double quotes",
-      }
+      },
     ];
   }
 
@@ -65,7 +75,10 @@ export class JavaScriptFormatter extends BaseFormatter {
     return "1.0.0";
   }
 
-  public async validateSyntax(content: string, languageId: string): Promise<ValidationResult> {
+  public async validateSyntax(
+    content: string,
+    languageId: string
+  ): Promise<ValidationResult> {
     try {
       // Try parsing with Prettier to validate syntax
       const parser = this.getParser(languageId);
@@ -76,7 +89,7 @@ export class JavaScriptFormatter extends BaseFormatter {
         errors: [],
         warnings: [],
         suggestions: [],
-        executionTime: 0
+        executionTime: 0,
       };
     } catch (error) {
       let line = 0;
@@ -92,17 +105,19 @@ export class JavaScriptFormatter extends BaseFormatter {
 
       return {
         isValid: false,
-        errors: [{
-          code: "SYNTAX_ERROR",
-          message,
-          line,
-          column,
-          severity: DiagnosticLevel.ERROR,
-          source: this.name
-        }],
+        errors: [
+          {
+            code: "SYNTAX_ERROR",
+            message,
+            line,
+            column,
+            severity: DiagnosticLevel.ERROR,
+            source: this.name,
+          },
+        ],
         warnings: [],
         suggestions: [],
-        executionTime: 0
+        executionTime: 0,
       };
     }
   }
@@ -241,50 +256,54 @@ export class JavaScriptFormatter extends BaseFormatter {
           suggestions: [],
           formatterUsed: "builtin",
           executionTime: 0,
-          linesProcessed: formattedText.split('\n').length,
+          linesProcessed: formattedText.split("\n").length,
           charactersProcessed: formattedText.length,
-          fromCache: false
+          fromCache: false,
         };
       }
 
       return {
         success: false,
         edits: [],
-        errors: [{
-          code: "NO_EDITS",
-          message: "Built-in formatter returned no edits",
-          line: 0,
-          column: 0,
-          severity: DiagnosticLevel.ERROR,
-          source: this.name
-        }],
+        errors: [
+          {
+            code: "NO_EDITS",
+            message: "Built-in formatter returned no edits",
+            line: 0,
+            column: 0,
+            severity: DiagnosticLevel.ERROR,
+            source: this.name,
+          },
+        ],
         warnings: [],
         suggestions: [],
         formatterUsed: "builtin",
         executionTime: 0,
         linesProcessed: 0,
         charactersProcessed: 0,
-        fromCache: false
+        fromCache: false,
       };
     } catch (error) {
       return {
         success: false,
         edits: [],
-        errors: [{
-          code: "FORMATTER_ERROR",
-          message: `Built-in formatter failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-          line: 0,
-          column: 0,
-          severity: DiagnosticLevel.ERROR,
-          source: this.name
-        }],
+        errors: [
+          {
+            code: "FORMATTER_ERROR",
+            message: `Built-in formatter failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+            line: 0,
+            column: 0,
+            severity: DiagnosticLevel.ERROR,
+            source: this.name,
+          },
+        ],
         warnings: [],
         suggestions: [],
         formatterUsed: "builtin",
         executionTime: 0,
         linesProcessed: 0,
         charactersProcessed: 0,
-        fromCache: false
+        fromCache: false,
       };
     }
   }
@@ -402,21 +421,23 @@ export class JavaScriptFormatter extends BaseFormatter {
     return {
       success: false,
       edits: [],
-      errors: [{
-        code: "FORMATTING_ERROR",
-        message: enhancedMessage,
-        line: 0,
-        column: 0,
-        severity: DiagnosticLevel.ERROR,
-        source: this.name
-      }],
+      errors: [
+        {
+          code: "FORMATTING_ERROR",
+          message: enhancedMessage,
+          line: 0,
+          column: 0,
+          severity: DiagnosticLevel.ERROR,
+          source: this.name,
+        },
+      ],
       warnings: [],
       suggestions: [],
       formatterUsed: this.name,
       executionTime: 0,
       linesProcessed: 0,
       charactersProcessed: 0,
-      fromCache: false
+      fromCache: false,
     };
   }
 }
