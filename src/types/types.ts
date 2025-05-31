@@ -448,9 +448,6 @@ export interface BuiltInFormatterInfo {
 }
 
 /**
- * **Batch formatting result**
- */
-/**
  * **Batch formatting result interface**
  */
 export interface BatchFormattingResult {
@@ -510,9 +507,6 @@ export interface ConfigurationProfile {
   isDefault: boolean;
 }
 
-/**
- * **Configuration Service interface**
- */
 /**
  * **Git service interface**
  */
@@ -596,4 +590,12 @@ export interface PreviewResult {
   newLength?: number;
   formatterUsed?: string;
   error?: string;
+}
+
+/**
+ * **Preview service interface**
+ */
+export interface IPreviewService {
+  showPreview(document: vscode.TextDocument): Promise<void>;
+  dispose(): void;
 }

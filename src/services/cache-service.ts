@@ -7,7 +7,7 @@ import { ILoggingService } from "../types";
 /**
  * **Cache service interface**
  */
-interface ICacheService {
+export interface ICacheService {
   get<T>(key: string): Promise<T | undefined>;
   set<T>(key: string, value: T, expirationMinutes?: number): Promise<void>;
   delete(key: string): Promise<void>;

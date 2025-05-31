@@ -25,7 +25,7 @@ export interface ICodeAnalyzer {
  */
 export interface AnalysisResult {
   metrics: CodeMetrics;
-  suggestions: StyleSuggestion[];
+  suggestions: AnalysisStyleSuggestion[];
   errors: vscode.Diagnostic[];
   executionTime: number;
 }
@@ -42,18 +42,18 @@ export interface CodeMetrics {
 /**
  * Style suggestion interface
  */
-export interface StyleSuggestion {
-  type: SuggestionType;
+export interface AnalysisStyleSuggestion {
+  type: AnalysisSuggestionType;
   message: string;
   range: vscode.Range;
-  severity: DiagnosticLevel;
+  severity: AnalysisDiagnosticLevel;
   fix?: vscode.CodeAction;
 }
 
 /**
  * Suggestion types
  */
-export enum SuggestionType {
+export enum AnalysisSuggestionType {
   FORMATTING = "formatting",
   STYLE = "style",
   CONVENTION = "convention",
@@ -63,7 +63,7 @@ export enum SuggestionType {
 /**
  * Diagnostic levels
  */
-export enum DiagnosticLevel {
+export enum AnalysisDiagnosticLevel {
   ERROR = "error",
   WARNING = "warning",
   INFO = "info",

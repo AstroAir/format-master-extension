@@ -2,9 +2,67 @@ import * as vscode from "vscode";
 import { ILoggingService, PerformanceMetrics, LanguageMetrics } from "../types";
 
 /**
+ * **Performance monitoring service interface**
+ */
+export interface IPerformanceMonitoringService {
+  recordFormatOperation(
+    languageId: string,
+    executionTime: number,
+    success: boolean,
+    cacheHit?: boolean,
+    fileSizeKB?: number
+  ): void;
+  recordMemoryUsage(): void;
+  getMetrics(): PerformanceMetrics;
+  getLanguageMetrics(languageId: string): LanguageMetrics | undefined;
+  getTopPerformingLanguages(
+    limit?: number
+  ): Array<{ language: string; metrics: LanguageMetrics }>;
+  getSlowestPerformingLanguages(
+    limit?: number
+  ): Array<{ language: string; metrics: LanguageMetrics }>;
+  resetMetrics(): void;
+  clearMetrics(): void;
+  setMemoryUsage(usage: number): void;
+  exportMetrics(filePath: string): Promise<void>;
+  generateReport(): string;
+  isEnabled(): boolean;
+  setEnabled(enabled: boolean): Promise<void>;
+}
+
+/**
+ * **Performance monitoring service interface**
+ */
+export interface IPerformanceMonitoringService {
+  recordFormatOperation(
+    languageId: string,
+    executionTime: number,
+    success: boolean,
+    cacheHit?: boolean,
+    fileSizeKB?: number
+  ): void;
+  recordMemoryUsage(): void;
+  getMetrics(): PerformanceMetrics;
+  getLanguageMetrics(languageId: string): LanguageMetrics | undefined;
+  getTopPerformingLanguages(
+    limit?: number
+  ): Array<{ language: string; metrics: LanguageMetrics }>;
+  getSlowestPerformingLanguages(
+    limit?: number
+  ): Array<{ language: string; metrics: LanguageMetrics }>;
+  resetMetrics(): void;
+  clearMetrics(): void;
+  setMemoryUsage(usage: number): void;
+  exportMetrics(filePath: string): Promise<void>;
+  generateReport(): string;
+  isEnabled(): boolean;
+  setEnabled(enabled: boolean): Promise<void>;
+}
+
+/**
  * **Service for monitoring and tracking formatting performance metrics**
  */
-export class PerformanceMonitoringService {
+export class PerformanceMonitoringService implements IPerformanceMonitoringService {
   private metrics: PerformanceMetrics = {
     totalFormatOperations: 0,
     averageFormatTime: 0,
